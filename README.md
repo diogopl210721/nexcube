@@ -4,8 +4,6 @@ Site estático (HTML + Three.js + GSAP), pronto para o GitHub Pages.
 Domínio: **www.nexcube3d.com.br**
 
 ## Antes de publicar
-1. No `index.html`, procure `NEXCUBE_WHATSAPP` e troque pelo número real da NexCube
-   (só dígitos, com 55 + DDD, ex.: `5541991234567`).
 2. Fotos em `assets/` foram recortadas do Instagram (baixa resolução). Substitua por fotos
    originais mantendo o mesmo nome de arquivo.
 

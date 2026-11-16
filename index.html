@@ -93,7 +93,18 @@ section{padding:clamp(5rem,11vw,9rem) 0}
 /* PRINT (sticky) */
 .print{padding:0;height:320vh;position:relative}
 .print .sticky{position:sticky;top:0;height:100vh;overflow:hidden;display:grid;align-items:center}
-#printCanvas{position:absolute;inset:0;width:100%;height:100%}
+.pstage{position:absolute;right:4vw;top:50%;transform:translateY(-50%);width:min(48vw,680px);aspect-ratio:1200/910;z-index:1;--cut:100%;--nx:50%}
+.pimg{position:absolute;inset:0;border-radius:26px;background:url(assets/impressao-natal.jpg) center/cover no-repeat}
+.pimg.ghost{filter:grayscale(1) brightness(1.4) contrast(.7);opacity:.13}
+.pgrid{position:absolute;inset:0;border-radius:26px;border:1px dashed rgba(122,60,255,.35);background-image:linear-gradient(rgba(122,60,255,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(122,60,255,.12) 1px,transparent 1px);background-size:28px 28px}
+.pimg.real{clip-path:inset(var(--cut) 0 0 0 round 26px);transition:box-shadow .6s}
+.pstage.done .pimg.real{box-shadow:0 0 0 1px rgba(160,32,255,.5),0 30px 90px -20px rgba(122,60,255,.75)}
+.scan{position:absolute;left:-2%;right:-2%;top:var(--cut);height:3px;margin-top:-1px;background:linear-gradient(90deg,transparent,#36c8ff 15%,#fff 50%,#36c8ff 85%,transparent);box-shadow:0 0 18px 4px rgba(54,200,255,.7),0 0 60px 10px rgba(122,60,255,.45)}
+.pstage.done .scan,.pstage.idle .scan{opacity:0}
+.nozzle{position:absolute;left:var(--nx);bottom:3px;width:46px;height:58px;margin-left:-23px}
+.nozzle::before{content:"";position:absolute;left:0;right:0;top:0;height:36px;border-radius:8px;background:linear-gradient(135deg,#7a3cff,#1f4bd6);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 8px 20px rgba(0,0,0,.5)}
+.nozzle::after{content:"";position:absolute;left:50%;top:36px;margin-left:-9px;border:9px solid transparent;border-top:18px solid #ffbe55;border-bottom:0}
+.nozzle b{position:absolute;left:50%;bottom:-6px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:#ffd27a;box-shadow:0 0 14px 6px rgba(255,170,60,.85)}
 .print .wrap{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr;pointer-events:none}
 .print .copy{grid-column:1}
 .steps-print{margin-top:2rem;display:grid;gap:.9rem}
@@ -105,7 +116,8 @@ section{padding:clamp(5rem,11vw,9rem) 0}
 .layer-count small{display:block;font-family:Inter;font-size:.8rem;letter-spacing:.25em;color:var(--mut);font-weight:600;margin-top:.5rem}
 .progress{height:4px;background:rgba(255,255,255,.08);border-radius:4px;margin-top:1.2rem;max-width:360px;overflow:hidden}
 .progress i{display:block;height:100%;width:0;background:var(--grad)}
-@media(max-width:900px){.print .wrap{grid-template-columns:1fr;align-content:start;padding-top:96px}
+@media(max-width:900px){.pstage{left:5vw;right:5vw;width:auto;top:auto;bottom:5vh;transform:none}
+ .print .wrap{grid-template-columns:1fr;align-content:start;padding-top:96px}
  .print .copy{background:linear-gradient(to bottom,rgba(7,6,15,.9) 60%,transparent);padding-bottom:2rem}
  .steps-print{display:none}.layer-count{margin-top:1rem}}
 
@@ -276,7 +288,12 @@ footer a:hover{color:#fff}
 <!-- ============ PRINT ============ -->
 <section class="print" id="processo">
   <div class="sticky">
-    <canvas id="printCanvas" aria-hidden="true"></canvas>
+    <div class="pstage" aria-hidden="true">
+      <div class="pimg ghost"></div>
+      <div class="pgrid"></div>
+      <div class="pimg real" id="pReal"></div>
+      <div class="scan" id="scan"><i class="nozzle" id="nozzle"><b></b></i></div>
+    </div>
     <div class="wrap">
       <div class="copy">
         <span class="eyebrow">Como nasce uma peça</span>
@@ -447,7 +464,7 @@ footer a:hover{color:#fff}
 <!-- ============ CONFIG ============ -->
 <script>
   /* >>> TROQUE AQUI pelo WhatsApp da NexCube (DDI+DDD+número, só dígitos) <<< */
-  window.NEXCUBE_WHATSAPP = "5541999999999";
+  window.NEXCUBE_WHATSAPP = "5541996239421";
   document.getElementById('ano').textContent = new Date().getFullYear();
   document.querySelectorAll('.js-wa').forEach(a=>{
     a.href = "https://wa.me/"+window.NEXCUBE_WHATSAPP+"?text="+encodeURIComponent(a.dataset.msg||"Olá NexCube!");
@@ -501,6 +518,20 @@ footer a:hover{color:#fff}
       c.addEventListener('mouseleave',()=>c.style.transform='');
     });
   }
+
+
+  // impressão da foto camada por camada
+  const ps=document.querySelector('.pstage'),nEl=document.getElementById('layerN'),bar=document.getElementById('prog'),steps=document.querySelectorAll('.sp');
+  let pr=0,ptarget=0;
+  ScrollTrigger.create({trigger:'.print',start:'top top',end:'bottom bottom',scrub:true,onUpdate:s=>ptarget=s.progress});
+  (function ploop(){requestAnimationFrame(ploop);
+    pr+=(ptarget-pr)*.1; const p=Math.min(1,Math.max(0,(pr-.12)/.72));
+    ps.style.setProperty('--cut',((1-p)*100).toFixed(2)+'%');
+    ps.style.setProperty('--nx',(50+Math.sin(performance.now()/260)*44).toFixed(2)+'%');
+    ps.classList.toggle('done',p>=.999); ps.classList.toggle('idle',p<=.001);
+    nEl.textContent=Math.round(p*1240).toLocaleString('pt-BR'); bar.style.width=(pr*100)+'%';
+    const si=pr<.12?0:pr<.3?1:pr<.86?2:3; steps.forEach((x,i)=>x.classList.toggle('on',i<=si));
+  })();
 
   // NFC demo
   const stage=document.getElementById('stage'),idle=document.getElementById('idle');
@@ -654,117 +685,6 @@ function glowEdges(geo, color, opacity=.9){
   })();
 })();
 
-/* ---------------- PRINT: impressão camada por camada ---------------- */
-(function printer(){
-  const canvas = document.getElementById('printCanvas');
-  const renderer = makeRenderer(canvas); renderer.localClippingEnabled = true;
-  const scene = new THREE.Scene(); scene.environment = envFor(renderer);
-  const cam = new THREE.PerspectiveCamera(32, 1, .1, 100);
-
-  const rig = new THREE.Group(); scene.add(rig);
-
-  // mesa de impressão
-  const bed = new THREE.Mesh(new RoundedBoxGeometry(6.5,.25,6.5,3,.08),
-    new THREE.MeshPhysicalMaterial({color:'#15122b', metalness:.6, roughness:.35, clearcoat:.6}));
-  bed.position.y = -.125; rig.add(bed);
-  const grid = new THREE.GridHelper(6.2, 24, '#5b3cff', '#2a2550'); grid.position.y = .01; grid.material.transparent = true; grid.material.opacity = .5; rig.add(grid);
-
-  // peça: anjo/luminária treliçada (lathe com padrão)
-  const prof = [];
-  const HGT = 4.2;
-  for(let i=0;i<=60;i++){ const y = i/60*HGT;
-    let r = 1.55 - Math.pow(i/60,1.6)*0.85; if(i>50) r = .7 + Math.sin((i-50)/10*Math.PI)*.35; if(i===60) r=.02;
-    prof.push(new THREE.Vector2(Math.max(r,.02), y)); }
-  const objGeo = new THREE.LatheGeometry(prof, 96);
-  const clip = new THREE.Plane(new THREE.Vector3(0,-1,0), 0);
-
-  const lat = document.createElement('canvas'); lat.width = lat.height = 256; const g = lat.getContext('2d');
-  g.fillStyle='#fff'; g.fillRect(0,0,256,256); g.strokeStyle='#000'; g.lineWidth=7;
-  for(let k=-256;k<512;k+=32){ g.beginPath(); g.moveTo(k,0); g.lineTo(k+256,256); g.stroke(); g.beginPath(); g.moveTo(k,256); g.lineTo(k+256,0); g.stroke(); }
-  const alpha = new THREE.CanvasTexture(lat); alpha.wrapS = alpha.wrapT = THREE.RepeatWrapping; alpha.repeat.set(10,7);
-
-  const objMat = new THREE.MeshPhysicalMaterial({color:'#f2ecff', metalness:.05, roughness:.45, clearcoat:.4, sheen:1, sheenColor:new THREE.Color('#b98cff'),
-    clippingPlanes:[clip], side:THREE.DoubleSide, alphaMap:alpha, alphaTest:.5, emissive:'#3b1d7a', emissiveIntensity:.15});
-  const obj = new THREE.Mesh(objGeo, objMat); rig.add(obj);
-
-  // asas
-  const wingShape = new THREE.Shape(); wingShape.moveTo(0,0); wingShape.bezierCurveTo(1.2,.4,1.8,1.6,1.5,2.4); wingShape.bezierCurveTo(1,1.6,.5,1.1,0,1.0); wingShape.closePath();
-  const wingGeo = new THREE.ExtrudeGeometry(wingShape,{depth:.08,bevelEnabled:false});
-  const wingMat = objMat.clone(); wingMat.alphaMap = null; wingMat.alphaTest = 0; wingMat.transparent = true; wingMat.opacity=.92;
-  const w1 = new THREE.Mesh(wingGeo, wingMat); w1.position.set(.6,1.6,-.3); w1.rotation.y = -.5; rig.add(w1);
-  const w2 = w1.clone(); w2.scale.x = -1; w2.position.x = -.6; w2.rotation.y = .5; rig.add(w2);
-  // auréola
-  const halo = new THREE.Mesh(new THREE.TorusGeometry(.65,.07,12,64), new THREE.MeshPhysicalMaterial({color:'#ffcf5a', metalness:1, roughness:.2, clippingPlanes:[clip], emissive:'#ff9d00', emissiveIntensity:.3}));
-  halo.rotation.x = Math.PI/2.3; halo.position.y = HGT + .55; rig.add(halo);
-
-  // linha de corte brilhante (camada sendo impressa)
-  const layerRing = new THREE.Mesh(new THREE.TorusGeometry(1,.035,8,96), new THREE.MeshBasicMaterial({color:'#36c8ff'}));
-  layerRing.rotation.x = Math.PI/2; rig.add(layerRing);
-
-  // bico extrusor
-  const head = new THREE.Group();
-  const block = new THREE.Mesh(new RoundedBoxGeometry(1,.7,1,3,.08), glossy(new THREE.Color('#2a1d5c'),.05));
-  const nozzle = new THREE.Mesh(new THREE.ConeGeometry(.16,.4,24), new THREE.MeshPhysicalMaterial({color:'#ffbe55', metalness:1, roughness:.25}));
-  nozzle.rotation.x = Math.PI; nozzle.position.y = -.55;
-  const tip = new THREE.Mesh(new THREE.SphereGeometry(.06,16,16), new THREE.MeshBasicMaterial({color:'#ffd27a'}));
-  tip.position.y = -.78; block.position.y = 0;
-  head.add(block, nozzle, tip); rig.add(head);
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(9,.12,.12), new THREE.MeshPhysicalMaterial({color:'#3a3566', metalness:.8, roughness:.3}));
-  rig.add(rail);
-  const tipLight = new THREE.PointLight('#ffb347', 8, 4); head.add(tipLight); tipLight.position.y = -.8;
-
-  scene.add(new THREE.AmbientLight(0xffffff,.35));
-  const k1 = new THREE.PointLight('#a020ff', 70, 30); k1.position.set(-5,6,5); scene.add(k1);
-  const k2 = new THREE.PointLight('#1f7bff', 70, 30); k2.position.set(5,3,4); scene.add(k2);
-
-  const {c:composer} = composerFor(renderer, scene, cam, .55);
-
-  function size(){ const w = canvas.clientWidth, h = canvas.clientHeight;
-    renderer.setSize(w,h,false); composer.setSize(w,h); cam.aspect = w/h; cam.updateProjectionMatrix();
-    const isM = w < 900; rig.position.set(isM?0:2.6, isM?-2.8:-1.9, 0); rig.scale.setScalar(isM?.78:1);
-    cam.position.set(0, 3.2, isM?15:13); cam.lookAt(isM?0:0, isM?-.6:.4, 0); }
-  size(); addEventListener('resize', size);
-
-  let prog = 0, target = 0;
-  const steps = document.querySelectorAll('.sp'), nEl = document.getElementById('layerN'), bar = document.getElementById('prog');
-  const TOTAL = 1240;
-  if(window.ScrollTrigger){
-    ScrollTrigger.create({trigger:'.print', start:'top top', end:'bottom bottom', scrub:true, onUpdate:s=>target=s.progress});
-  } else target = 1;
-
-  let visible = false;
-  new IntersectionObserver(([e])=>visible=e.isIntersecting).observe(canvas);
-  const clock = new THREE.Clock();
-  (function loop(){
-    requestAnimationFrame(loop); if(!visible) return;
-    const t = clock.getElapsedTime();
-    prog += (target-prog)*.08;
-    const p = THREE.MathUtils.clamp((prog-.12)/.72, 0, 1);       // fase de impressão
-    const h = p*(HGT+1.25);
-    clip.constant = h + rig.position.y;                       // plano em coordenada de mundo
-    clip.constant = (h)*rig.scale.y + rig.position.y;
-    // raio na altura atual para o anel
-    const yi = Math.min(60, Math.round(Math.min(h,HGT)/HGT*60)); const r = prof[yi].x;
-    layerRing.position.y = Math.min(h,HGT); layerRing.scale.setScalar(Math.max(r,.05));
-    layerRing.visible = p>0 && p<1;
-    // asas aparecem quando a impressão passa da altura delas
-    [w1,w2].forEach(w=>{ w.visible = h>1.6; w.scale.y = THREE.MathUtils.clamp((h-1.6)/2.4,0.001,1); });
-    // bico circula na camada atual
-    const a = t*6;
-    head.position.set(Math.cos(a)*r, Math.min(h,HGT+.6)+.85, Math.sin(a)*r);
-    head.visible = p<1; rail.position.y = head.position.y+.1; rail.position.z = head.position.z; rail.visible = p<1;
-    tip.material.color.setHSL(.1, 1, .6 + Math.sin(t*20)*.1);
-    // pronto: gira e brilha
-    const done = THREE.MathUtils.clamp((prog-.86)/.14,0,1);
-    rig.rotation.y = t*.15 + done*Math.PI*.6;
-    objMat.emissiveIntensity = .15 + done*.35;
-    nEl.textContent = Math.round(p*TOTAL).toLocaleString('pt-BR');
-    bar.style.width = (prog*100)+'%';
-    const si = prog<.12?0: prog<.3?1: prog<.86?2:3;
-    steps.forEach((s,i)=>s.classList.toggle('on', i<=si));
-    composer.render();
-  })();
-})();
 </script>
 </body>
 </html>
