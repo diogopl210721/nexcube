@@ -5,7 +5,7 @@
   const S = { me: null, customers: [], leads: [], sales: [], comms: [], price: null, tab: "pedidos" };
   const LEAD_ST = { new: ["Novo", "info"], contact: ["Em conversa", "warn"], sold: ["Vendido", "ok"], lost: ["Não fechou", ""] };
   const KIND = { nexcube: "Link da Nexcube", client: "Indicação de cliente", self: "Cliente da tag (p/ si)" };
-  const money = (v) => ED.fmtMoney(v) || "—";
+  const money = (v) => (v == null || v === "" ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
   const cname = (id) => (S.customers.find((c) => c.id === id) || {}).company_name || "—";
   const model = (id) => ((window.NC_MS.models.find((m) => m.id === id)) || {}).full || "—";
 
@@ -45,7 +45,7 @@
       ev.preventDefault(); const ok = NC.checkPhonePin(f); if (!ok) return;
       const btn = NC.$("button", f); btn.disabled = true;
       try { await fn({ action: "bootstrap_dds", name: f.name.value.trim(), phone: ok.phone, pin: ok.pin });
-        const { error } = await NC.sb.auth.signInWithPassword(NC.authFromPhone(ok.phone, ok.pin)); if (error) throw error; boot(); }
+        const { error } = await NC.sb.auth.signInWithPassword(NC.authFromPhone(ok.phone, ok.pin)); if (error) throw error; run(); }
       catch (err) { NC.err(err); btn.disabled = false; }
     };
   }
@@ -198,5 +198,6 @@
       } }] });
   }
 
-  boot();
+  const run = () => boot().catch((err) => { console.error(err); root.innerHTML = `<div class="center-msg"><div class="card" style="max-width:420px;text-align:center"><h3>Não foi possível abrir o painel</h3><p class="muted small">${e(err.message || String(err))}</p><button class="btn primary" onclick="location.reload()">Tentar de novo</button></div></div>`; });
+  run();
 })();
