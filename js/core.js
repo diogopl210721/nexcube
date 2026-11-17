@@ -3,8 +3,11 @@
   const C = window.NC_CONFIG;
   const NC = (window.NC = window.NC || {});
 
+  /* Cada área tem a sua própria sessão: /adm (expira ao fechar o navegador), /painel e a página pública */
+  const AREA = window.NC_AUTH || { key: "nc-pub" };
+  let store; try { store = AREA.session ? window.sessionStorage : window.localStorage; store.setItem("nc-t", "1"); store.removeItem("nc-t"); } catch (e) { store = undefined; }
   NC.sb = window.supabase.createClient(C.supabaseUrl, C.supabaseKey, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: "nc-auth" }
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: AREA.key, storage: store }
   });
 
   /* ---------- utilidades ---------- */

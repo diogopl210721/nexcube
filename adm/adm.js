@@ -42,7 +42,14 @@
       NC.$("#out").onclick = async () => { await NC.sb.auth.signOut(); boot(); };
       return;
     }
-    S.me = s; shell(); addEventListener("hashchange", route); route();
+    S.me = s; shell(); addEventListener("hashchange", route); route(); idleGuard();
+  }
+
+  /* Sai sozinho após 30 minutos sem uso */
+  let idleT;
+  function idleGuard() {
+    const reset = () => { clearTimeout(idleT); idleT = setTimeout(async () => { await NC.sb.auth.signOut(); NC.toast("Sessão encerrada por inatividade."); location.hash = ""; boot(); }, 30 * 60 * 1000); };
+    ["click", "keydown", "touchstart", "scroll"].forEach((ev) => addEventListener(ev, reset, { passive: true })); reset();
   }
 
   /* Primeiro acesso: cria o administrador principal (só funciona enquanto não existe nenhum) */
@@ -186,7 +193,8 @@
         <div class="grid2"><label>Cor principal<input type="color" name="primary_color" value="${e(c.primary_color)}"></label><label>Cor de fundo<input type="color" name="bg_color" value="${e(c.bg_color)}"></label></div>
         <label>Logo <small>(opcional, até 2 MB)</small><input type="file" name="logo" accept="image/png,image/jpeg,image/webp"></label>
         <label>Observações internas <small>(só a Nexcube vê)</small><textarea name="notes" placeholder="Anotações sobre o cliente">${e(c._notes || "")}</textarea></label>
-        ${isNew ? `<label class="row" style="font-weight:600"><input type="checkbox" name="mktag" checked> Já criar uma tag (NFC + QR Code) para este cliente</label>` : ""}
+        ${isNew ? `<label class="row" style="font-weight:600"><input type="checkbox" name="mktag" checked> Já criar uma tag (NFC + QR Code) para este cliente</label>
+          <label class="row" style="font-weight:600"><input type="checkbox" name="mkwa" checked> Já criar o botão "Fale no WhatsApp" com o telefone do cliente</label>` : ""}
       </form>`,
       onOpen: (w) => {
         const f = NC.$("#fC", w); f.status.value = c.status;
@@ -235,6 +243,8 @@
           await NC.sb.from("nc_customer_notes").upsert({ customer_id: saved.id, notes: f.notes.value.trim() || null, updated_at: new Date().toISOString() });
           // 4) tag
           if (isNew && f.mktag && f.mktag.checked && !w._tagDone) { const r = await NC.sb.from("nc_tags").insert({ customer_id: saved.id, label: "Tag principal", tag_type: "nfc_qr" }); if (r.error) warn.push("a tag não foi criada"); else w._tagDone = true; }
+          // 4b) primeiro botão da página (WhatsApp), para a página não nascer vazia
+          if (isNew && acc && f.mkwa && f.mkwa.checked && !w._waDone) { const r = await NC.sb.from("nc_links").insert({ customer_id: saved.id, title: "Fale no WhatsApp", url: NC.waLink(acc.phone, "Olá! Vim pela sua página."), link_type: "whatsapp", sort_order: 0 }); if (!r.error) w._waDone = true; }
           // 5) login (telefone + PIN)
           if (acc) { try { await fn({ action: "set_client_access", customer_id: saved.id, phone: acc.phone, pin: acc.pin }); } catch (err) { warn.push("o login não foi criado: " + err.message); } }
           if (warn.length) NC.toast("Cliente salvo, mas " + warn.join("; ") + ". Ajuste na ficha do cliente.", "err");
@@ -469,6 +479,7 @@
       body: `<div class="stack" style="align-items:center;text-align:center"><div class="qr-box" style="justify-content:center"><div class="qr" style="width:240px;height:240px">${NC.qrSvg(NC.tagUrl(t.code), 480)}</div></div>
         <div class="url-line" style="width:100%"><span>${e(NC.tagUrl(t.code))}</span></div>
         <p class="muted small">Grave na tag NFC exatamente este endereço.</p></div>`,
+      onOpen: (w) => { const b = document.createElement("button"); b.className = "btn"; b.innerHTML = ic("nfc", 18) + " Passo a passo de gravação"; b.onclick = () => ED.writeGuide(t.code); NC.$(".modal-b .stack", w).appendChild(b); },
       actions: [{ label: "Copiar endereço", onClick: () => { NC.copy(NC.tagUrl(t.code)); return false; } }, { label: "SVG", onClick: () => { NC.downloadQr(t.code, "svg"); return false; } }, { label: "Baixar PNG", cls: "primary", onClick: () => { NC.downloadQr(t.code, "png"); return false; } }]
     });
   }
@@ -495,6 +506,7 @@
         <td><span class="badge ${t.status === "active" ? "ok" : "bad"}">${t.status === "active" ? "Ativa" : "Suspensa"}</span></td>
         <td class="small">${NC.fmtDateTime(t.last_access_at)}</td>
         <td><div class="row" style="flex-wrap:nowrap">
+          <button class="btn sm" title="Como gravar a tag NFC" data-gv="${t.id}">${ic("nfc", 16)} Gravar</button>
           <button class="icon-btn" title="QR Code" data-qr="${t.id}">${ic("download", 18)}</button>
           <button class="icon-btn" title="Copiar URL" data-cp="${t.id}">${ic("copy", 18)}</button>
           <button class="icon-btn" title="Vincular/alterar cliente" data-mv="${t.id}">${ic("users", 18)}</button>
@@ -504,6 +516,7 @@
         : `<tr><td colspan="7"><div class="empty">${ic("tag", 34)}Nenhuma tag encontrada.</div></td></tr>`;
       const T = (id) => S.tags.find((x) => x.id === id);
       NC.$$("[data-qr]").forEach((b) => (b.onclick = () => tagQrModal(T(b.dataset.qr))));
+      NC.$$("[data-gv]").forEach((b) => (b.onclick = () => ED.writeGuide(T(b.dataset.gv).code)));
       NC.$$("[data-cp]").forEach((b) => (b.onclick = () => NC.copy(NC.tagUrl(T(b.dataset.cp).code), "Endereço copiado!")));
       NC.$$("[data-mv]").forEach((b) => (b.onclick = () => tagMove(T(b.dataset.mv))));
       NC.$$("[data-ed]").forEach((b) => (b.onclick = () => tagEdit(T(b.dataset.ed))));

@@ -233,6 +233,34 @@
     draw();
   };
 
+  /* ---------------- PASSO A PASSO: GRAVAR A TAG NFC ---------------- */
+  ED.writeGuide = (code) => {
+    const url = NC.tagUrl(code);
+    const step = (n, t, d) => `<div class="tl cur" style="padding-bottom:1.1rem"><span class="d" style="background:var(--grad);border:0;color:#fff;font-weight:800;font-size:.8rem">${n}</span><div><b>${t}</b><small style="font-size:.84rem;margin-top:.15rem">${d}</small></div></div>`;
+    NC.modal({
+      title: "Como gravar a tag NFC", wide: true,
+      body: `<div class="split" style="grid-template-columns:1.3fr 1fr">
+        <div class="timeline">
+          ${step(1, "Instale o app NFC Tools", "Gratuito, para iPhone e Android (desenvolvedor wakdev).")}
+          ${step(2, "Abra o app → Gravar → Adicionar um registro", "No iPhone a aba se chama <b>Write</b>; escolha <b>URL / URI</b>.")}
+          ${step(3, "Cole o endereço da tag", "Use o botão <b>Copiar</b> ao lado. Grave exatamente este endereço, sem espaços.")}
+          ${step(4, "Toque em Gravar e encoste a tag no celular", "iPhone: na parte de cima, atrás. Android: no meio das costas. Segure até aparecer a confirmação.")}
+          ${step(5, "Teste", "Com a tela desbloqueada, aproxime a tag: a página do cliente deve abrir. Teste também o QR Code com a câmera.")}
+          ${step(6, "Opcional: bloquear a tag", "No app: Outros → Bloquear tag. É <b>permanente</b>, faça só depois de testar. Como o destino muda pelo painel, nunca será preciso regravar.")}
+        </div>
+        <div class="stack">
+          <div class="card" style="box-shadow:none;background:var(--soft)"><span class="muted small">Endereço para gravar</span>
+            <div class="url-line" style="background:#fff;margin-top:.4rem"><span><b>${e(url)}</b></span><button class="icon-btn" id="gvCopy" aria-label="Copiar">${ic("copy", 18)}</button></div>
+            <div class="qr-box" style="justify-content:center;margin-top:1rem"><div class="qr">${NC.qrSvg(url, 360)}</div></div>
+            <p class="muted tiny" style="text-align:center;margin-top:.5rem">O QR Code abre o mesmo endereço</p></div>
+          <p class="alert info small">${ic("sparkle", 18)}<span><b>Tag recomendada:</b> NTAG213, 215 ou 216 (cabe com folga). Etiquetas metálicas precisam ser do tipo "anti-metal".</span></p>
+          <p class="alert warn small">${ic("eye", 18)}<span><b>QR impresso:</b> mínimo de 2 × 2 cm, em fundo claro. Teste antes de produzir em quantidade.</span></p>
+        </div></div>`,
+      onOpen: (w) => (NC.$("#gvCopy", w).onclick = () => NC.copy(url, "Endereço copiado! Cole no NFC Tools.")),
+      actions: [{ label: "Baixar QR (PNG)", onClick: () => { NC.downloadQr(code, "png"); return false; } }, { label: "Entendi", cls: "primary" }]
+    });
+  };
+
   /* ---------------- TAG (QR dinâmico + destino) ---------------- */
   const TYPE_LABEL = { nfc: "NFC", qr: "QR Code", nfc_qr: "NFC + QR Code" };
   ED.TYPE_LABEL = TYPE_LABEL;
@@ -248,7 +276,7 @@
         <div class="qr">${NC.qrSvg(url, 360)}</div>
         <div class="stack grow" style="gap:.6rem">
           <div class="url-line"><span>${e(url)}</span><button class="icon-btn" data-copy aria-label="Copiar endereço">${ic("copy", 18)}</button></div>
-          <div class="row"><button class="btn sm" data-png>${ic("download", 16)} Baixar QR (PNG)</button><button class="btn sm" data-svg>${ic("download", 16)} SVG</button></div>
+          <div class="row"><button class="btn sm" data-png>${ic("download", 16)} Baixar QR (PNG)</button><button class="btn sm" data-svg>${ic("download", 16)} SVG</button><button class="btn sm" data-gv>${ic("nfc", 16)} Como gravar a tag NFC</button></div>
           <p class="alert info small">${ic("nfc", 18)}<span><b>Esse endereço nunca muda.</b> Mudou o destino abaixo? A tag e o QR Code impressos continuam funcionando, sem regravar nada.</span></p>
         </div>
       </div>
@@ -264,6 +292,7 @@
     NC.$("[data-copy]", root).onclick = () => NC.copy(url, "Endereço da tag copiado!");
     NC.$("[data-png]", root).onclick = () => NC.downloadQr(tag.code, "png");
     NC.$("[data-svg]", root).onclick = () => NC.downloadQr(tag.code, "svg");
+    NC.$("[data-gv]", root).onclick = () => ED.writeGuide(tag.code);
     const f = NC.$("[data-dest]", root);
     f.onsubmit = async (ev) => {
       ev.preventDefault();

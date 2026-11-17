@@ -279,3 +279,19 @@ tr.click{cursor:pointer} tr.click:hover td{background:#faf9ff}
   .topbar .row{width:100%}
   .qr-box .qr{margin:0 auto}
 }
+
+/* página pública — acabamento */
+.pp{position:relative;overflow:hidden}
+.pp::before{content:"";position:absolute;inset:-20% -20% auto -20%;height:360px;background:radial-gradient(closest-side,var(--pp-primary),transparent);opacity:.22;pointer-events:none}
+.pp-inner{position:relative}
+.pp-logo{box-shadow:0 0 0 4px var(--pp-bg),0 0 0 6px color-mix(in srgb,var(--pp-primary) 60%,transparent),0 18px 40px -14px rgba(0,0,0,.55)}
+.pp-btn{position:relative;animation:ppIn .5s both}
+.pp-arrow{font-size:1.3rem;opacity:.6;width:16px}
+.pp-t{padding-right:12px}
+@keyframes ppIn{from{opacity:0;transform:translateY(10px)}}
+.pp-soon{display:grid;gap:.35rem;padding:1.4rem 1.2rem;border-radius:18px;border:1.5px dashed color-mix(in srgb,var(--pp-fg) 25%,transparent);text-align:center}
+.pp-soon b{font-size:1rem}.pp-soon span{opacity:.7;font-size:.88rem}
+.pp-actions{display:flex;gap:.6rem;justify-content:center;margin-top:1.1rem;flex-wrap:wrap}
+.pp-act{display:inline-flex;align-items:center;gap:.45rem;padding:.6rem 1rem;border-radius:999px;border:1.5px solid color-mix(in srgb,var(--pp-fg) 22%,transparent);background:color-mix(in srgb,var(--pp-fg) 6%,transparent);color:var(--pp-fg);font:inherit;font-size:.85rem;font-weight:600;cursor:pointer}
+.pp-act:hover{background:color-mix(in srgb,var(--pp-fg) 12%,transparent)}
+.pp.left .pp-actions{justify-content:flex-start}

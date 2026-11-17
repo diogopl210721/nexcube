@@ -21,7 +21,11 @@
       return NC.renderLogin(root, { title: "Entrar no meu painel", subtitle: "Painel do cliente", onDone: boot });
     }
     S.me = s;
-    if (s.profile && s.profile.role === "superadmin") { location.href = "/adm/"; return; }
+    if (s.profile && s.profile.role === "superadmin") {
+      await NC.sb.auth.signOut();
+      NC.toast("Esse telefone é de administrador. Para gerenciar clientes use /adm. Aqui, entre com o telefone do cliente.", "err");
+      return NC.renderLogin(root, { title: "Entrar no meu painel", subtitle: "Painel do cliente", onDone: boot });
+    }
     const { data: c } = await NC.sb.from("nc_customers").select("*").eq("owner_user_id", s.user.id).maybeSingle();
     if (!c) return blocked("Acesso não liberado", "Seu login ainda não está vinculado a nenhuma empresa. Fale com a Nexcube 3D para liberar o seu acesso.");
     if (c.status === "pending") return blocked("Aguardando liberação", "Seu cadastro está pronto! A Nexcube 3D vai liberar o seu painel em breve.");
