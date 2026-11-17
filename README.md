@@ -45,38 +45,34 @@ Storage: bucket público `nc-public` (logos/capas; até 2 MB; PNG/JPG/WEBP; past
 - Eventos sem IP; só domínio de origem e categoria do dispositivo (mobile/desktop/bot).
 - Auditoria automática de: cadastro, status, tags (criação, vínculo, código, destino), mini site, acessos.
 
+### Login: telefone + PIN (4 números)
+- Sem e-mail. Cliente e admin entram com **telefone (WhatsApp) + PIN de 4 números**.
+- Internamente o Supabase recebe um e-mail técnico (`55DDDNUMERO@tel.nexcube3d.com.br`, nunca recebe mensagens)
+  e uma senha que combina PIN + telefone (o Supabase exige 6+ caracteres). A regra está em `js/core.js`
+  (`NC.authFromPhone`) e na Edge Function — as duas precisam ser iguais.
+- No cadastro, telefone e PIN são digitados duas vezes (conferência).
+- Esqueceu o PIN: a NexCube define um novo em /adm → cliente → Acesso do cliente. Cada um pode trocar o próprio PIN.
+
 ### Edge Function `nc-admin`
-Usada apenas pelo /adm (verifica se quem chama é superadmin):
-- `invite_client` / `access_link`: cria o login do cliente e devolve um **link de acesso** (uso único, 24 h)
-  para a NexCube enviar pelo WhatsApp. O cliente cria a própria senha. Nenhuma senha é exibida.
-- `invite_admin`: convida novo administrador.
+- `has_admin` / `bootstrap_admin`: primeiro acesso ao /adm (só funciona enquanto não existir administrador).
+- `set_client_access`: cria/atualiza o login (telefone + PIN) do cliente — só superadmin.
+- `create_admin`: adiciona administrador — só superadmin.
 - `remove_access`: desvincula o login do cliente.
 
-## Configuração necessária no Supabase (uma vez)
-1. **Authentication → URL Configuration → Redirect URLs**: adicionar
-   `https://www.nexcube3d.com.br/**`
-   (sem isso, o link de acesso cai na URL padrão do projeto).
-2. **Primeiro superadministrador**: depois que a pessoa existir em Authentication (convide pelo painel do Supabase),
-   rodar no SQL Editor:
-   ```sql
-   insert into public.nc_profiles(id, role, email, full_name)
-   select id, 'superadmin', email, 'NexCube' from auth.users where email = 'EMAIL_DA_NEXCUBE'
-   on conflict (id) do update set role = 'superadmin';
-   ```
-   A partir daí, novos admins são convidados em /adm → Configurações.
-3. Recomendado: Authentication → ativar "Leaked password protection".
+## Primeiro acesso
+Abra **/adm**: enquanto não houver administrador, aparece "Criar administrador" (nome, telefone 2x, PIN 2x).
+Depois disso a tela some e novos admins são adicionados em /adm → Configurações.
 
 ## Fluxo de uso
 1. NexCube entra em `/adm` → **Novo cliente** (gera endereço `/empresadocliente` e já cria uma tag).
-2. Na ficha do cliente → **Criar acesso e gerar link** → enviar no WhatsApp.
-3. Cliente define a senha, entra em `/painel`, coloca logo, links e cores (prévia ao vivo).
+2. No cadastro já se define o login: telefone (2x) + PIN de 4 números (2x).
+3. Botão "Enviar instruções de acesso no WhatsApp". O cliente entra em `/painel`, coloca logo, links e cores (prévia ao vivo).
 4. NexCube grava na tag NFC / imprime o QR Code com `https://www.nexcube3d.com.br/r/CÓDIGO`.
 5. Cliente pode trocar o destino da tag (página, mini site, outro endereço) sem regravar a tag.
 
 ## Pendências / próximas versões
 - Editor visual de mini site dentro da plataforma (hoje: a DDS publica e vincula a URL).
 - Domínio próprio por cliente para mini sites.
-- E-mail transacional (SMTP próprio) se quiser enviar convites por e-mail em vez de WhatsApp.
 - Cliente com mais de uma empresa no mesmo login (hoje: 1 login = 1 empresa).
 
 ## DNS (Registro.br) — já configurado
