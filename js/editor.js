@@ -239,8 +239,6 @@
   /* mode: 'admin' (NexCube) | 'client' (cliente da tag) */
   ED.showcase = (root, { mode, c, price, onSelf }) => {
     const MS = window.NC_MS || { models: [] };
-    const pick = ["pizzaria", "salao", "barbearia", "dentista", "academia", "petshop", "oficina", "imobiliaria"];
-    const teaser = pick.map((id) => MS.models.find((m) => m.id === id)).filter(Boolean);
     const money = ED.fmtMoney(price);
     const myRef = mode === "admin" ? ED.refUrl("nexcube") : c && c.ref_code ? ED.refUrl(c.ref_code) : null;
     root.innerHTML = `<div class="ms-show">
@@ -255,9 +253,10 @@
             ${mode === "client" ? `<button class="btn" data-self>${ic("rocket", 18)} Quero um para mim</button>` : ""}
           </div>
         </div>
-        <a class="ms-mosaic" href="${e(MS.examplesUrl)}" target="_blank" rel="noopener" aria-label="Ver modelos">
-          ${teaser.map((m, i) => `<figure style="--d:${i * 0.06}s"><img src="${e(MS.cover(m.cover, 360))}" alt="" loading="lazy"><figcaption>${e(m.label)}</figcaption></figure>`).join("")}
-        </a>
+      </div>
+      <div class="ms-frame">
+        <div class="ms-frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="grow">Vitrine DDS · 30 modelos ao vivo</span><a href="${e(MS.examplesUrl)}" target="_blank" rel="noopener">${ic("eye", 15)} Tela cheia</a></div>
+        <iframe src="${e(MS.examplesUrl)}" title="Vitrine de mini sites DDS" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
       ${myRef ? `<div class="ms-ref">
         <div class="ms-ref-ic">${ic("users", 22)}</div>

@@ -13,7 +13,6 @@
     document.title = "Mini sites profissionais — DDS Inovação";
     const price = data.price != null ? Number(data.price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : null;
     const by = data.kind === "client" ? data.name : "Nexcube 3D";
-    const covers = MS.models.slice(0, 12);
     app.innerHTML = `
     <div class="ind">
       <div class="ind-bg" aria-hidden="true"><i></i><i></i></div>
@@ -26,9 +25,9 @@
         <div class="ind-price">${price ? `<small>Pagamento único</small><b>${price}</b>` : `<small>Preço</small><b>sob consulta</b>`}</div>
         <div class="ind-cta"><a class="btn primary" href="#pedir">${ic("rocket", 18)} Quero o meu</a><a class="btn ghost-l" href="${e(MS.examplesUrl)}" target="_blank" rel="noopener">${ic("eye", 18)} Ver os 30 modelos</a></div>
       </section>
-      <a class="ind-strip" href="${e(MS.examplesUrl)}" target="_blank" rel="noopener" aria-label="Ver modelos">
-        <div class="ind-track">${covers.concat(covers).map((m) => `<figure><img src="${e(MS.cover(m.cover, 340))}" alt="" loading="lazy"><figcaption>${e(m.label)}</figcaption></figure>`).join("")}</div>
-      </a>
+      <section class="ind-show"><div class="ms-frame">
+        <div class="ms-frame-bar"><span class="dots"><i></i><i></i><i></i></span><span class="grow">Vitrine DDS · toque para navegar</span><a href="${e(MS.examplesUrl)}" target="_blank" rel="noopener">${ic("eye", 15)} Tela cheia</a></div>
+        <iframe src="${e(MS.examplesUrl)}" title="Vitrine de mini sites DDS" loading="lazy"></iframe></div></section>
       <section class="ind-feats">
         <div>${ic("phone", 22)}<b>Feito para celular</b><span>Rápido e bonito em qualquer tela.</span></div>
         <div>${ic("whatsapp", 22)}<b>Clientes no WhatsApp</b><span>Botões que levam direto para a conversa.</span></div>
