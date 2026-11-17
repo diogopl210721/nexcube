@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Carregando…</title>
+<link rel="icon" href="/assets/logo-cube.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/app.css">
+<style>html,body{height:100%;background:#0f0e1a}#app{min-height:100%}</style>
+</head>
+<body>
+<div id="app"><div class="pp-msg"><div class="spin"></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="/js/config.js"></script>
+<script src="/js/core.js"></script>
+<script src="/js/public.js"></script>
+<script>
+/* Roteador público (GitHub Pages entrega este arquivo para qualquer caminho que não existe):
+   /r/NC-XXXX       -> QR Code / NFC dinâmico: resolve a tag e redireciona
+   /empresadocliente -> página pública do cliente */
+(async function () {
+  const app = document.getElementById("app");
+  const C = window.NC_CONFIG;
+  const parts = location.pathname.replace(/\/+$/, "").split("/").filter(Boolean).map(decodeURIComponent);
+  const params = new URLSearchParams(location.search);
+
+  function msg(title, text) {
+    document.title = title;
+    app.innerHTML = `<div class="pp-msg"><div><div style="font-size:2.4rem">🔒</div><h1>${NC.esc(title)}</h1><p>${NC.esc(text)}</p><footer>${NC.esc(C.footer)}</footer></div></div>`;
+  }
+
+  async function showPage(slug, tagCode) {
+    const { data, error } = await NC.sb.rpc("nc_public_page", { p_slug: slug });
+    if (error || !data || !data.ok) return msg("Página indisponível", "Este conteúdo está temporariamente indisponível. Tente novamente mais tarde.");
+    document.title = data.name;
+    const d = document.querySelector('meta[name="theme-color"]') || Object.assign(document.createElement("meta"), { name: "theme-color" });
+    d.content = data.bg_color; document.head.appendChild(d);
+    NC.renderPublic(app, data, {
+      onClick: (linkId) => { if (linkId) NC.sb.rpc("nc_log_event", { p_slug: slug, p_type: "click", p_link: linkId, p_tag: tagCode || null, p_ref: document.referrer || null, p_ua: navigator.userAgent }); }
+    });
+    // 1 visualização por sessão por página
+    const k = "nc-v-" + slug;
+    let seen = false; try { seen = sessionStorage.getItem(k); sessionStorage.setItem(k, "1"); } catch (e) {}
+    if (!seen) NC.sb.rpc("nc_log_event", { p_slug: slug, p_type: "view", p_tag: tagCode || null, p_ref: document.referrer || null, p_ua: navigator.userAgent });
+  }
+
+  try {
+    if (parts[0] === "r" && parts[1]) {
+      const { data, error } = await NC.sb.rpc("nc_resolve_tag", { p_code: parts[1], p_ref: document.referrer || null, p_ua: navigator.userAgent });
+      if (error || !data || !data.ok) return msg("Conteúdo indisponível", "Esta tag está temporariamente indisponível. Se você é o responsável, fale com a Nexcube 3D.");
+      if (data.type === "url" && /^https:\/\//.test(data.url)) return location.replace(data.url);
+      history.replaceState(null, "", "/" + data.slug);
+      return showPage(data.slug, data.tag);
+    }
+    if (parts.length === 1 && /^[a-z0-9]([a-z0-9-]{0,48}[a-z0-9])?$/i.test(parts[0])) {
+      return showPage(parts[0].toLowerCase(), params.get("t"));
+    }
+    msg("Página não encontrada", "O endereço digitado não existe.");
+  } catch (e) {
+    console.error(e);
+    msg("Conteúdo indisponível", "Não foi possível carregar agora. Verifique sua internet e tente novamente.");
+  }
+})();
+</script>
+</body>
+</html>
