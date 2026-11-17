@@ -11,7 +11,8 @@
     { id: "aparencia", label: "Aparência", icon: "paint" },
     { id: "tag", label: "Minha tag", short: "Tag", icon: "tag" },
     { id: "stats", label: "Estatísticas", icon: "chart" },
-    { id: "minisite", label: "Mini site", icon: "rocket" }
+    { id: "minisite", label: "Mini site", icon: "rocket" },
+    { id: "indique", label: "Indique e ganhe", icon: "users" }
   ];
   const BOTTOM = ["inicio", "links", "pagina", "tag", "stats"];
 
@@ -39,6 +40,7 @@
     ]);
     S.links = l.data || []; S.tags = t.data || []; S.reqs = r.data || [];
     (st.data || []).forEach((x) => (S.settings[x.key] = x.value));
+    S.leads = []; S.comms = []; try { await loadLeads(); } catch (x) {}
     if (S.reqs.length) { const { data } = await NC.sb.from("nc_minisite_notes").select("*").in("request_id", S.reqs.map((x) => x.id)).order("created_at"); S.notes = data || []; }
     shell();
     addEventListener("hashchange", () => { const h = location.hash.replace("#", ""); if (h && h !== S.view) go(h); });
@@ -85,7 +87,7 @@
     S.view = id; if (location.hash !== "#" + id) history.replaceState(null, "", "#" + id);
     NC.$$("[data-go]").forEach((b) => b.classList.toggle("on", b.dataset.go === id));
     const v = NC.$("#view"); window.scrollTo(0, 0);
-    ({ inicio, links, pagina, aparencia, tag, stats, minisite })[id](v);
+    ({ inicio, links, pagina, aparencia, tag, stats, minisite, indique })[id](v);
   }
 
   /* Layout com prévia ao vivo ao lado (desktop) ou botão de prévia (mobile) */
@@ -182,59 +184,75 @@
   }
 
   /* ---------------- MINI SITE ---------------- */
-  const REQ_STEPS = [["received", "Recebido"], ["analysis", "Em análise"], ["waiting_content", "Aguardando conteúdo"], ["in_development", "Em desenvolvimento"], ["waiting_approval", "Aguardando sua aprovação"], ["published", "Publicado"]];
+  /* ---------------- MINI SITE ---------------- */
   function minisite(v) {
-    const c = S.c, txt = S.settings.minisite_text || {};
-    const req = S.reqs.find((r) => r.status !== "cancelled");
-    let body = "";
+    const c = S.c;
+    const price = S.settings.minisite_price ? S.settings.minisite_price.value : null;
     if (c.minisite_status === "published" && c.minisite_url) {
-      body = `<div class="card stack"><span class="badge ok" style="width:max-content">Publicado</span><h2>Seu mini site está no ar 🎉</h2>
+      v.innerHTML = `<div class="topbar"><div><h1>Mini site</h1><p class="muted">Seu site profissional, criado pela DDS Inovação.</p></div></div>
+        <div class="card stack"><span class="badge ok" style="width:max-content">${ic("check", 14)} No ar</span><h2>Seu mini site está publicado 🎉</h2>
         <div class="url-line"><span>${e(c.minisite_url)}</span><button class="icon-btn" id="cpMs">${ic("copy", 18)}</button></div>
-        <div class="row"><a class="btn primary" target="_blank" rel="noopener" href="${e(c.minisite_url)}">${ic("eye", 18)} Visualizar</a><button class="btn" id="toTag">${ic("tag", 18)} Apontar minha tag para o mini site</button></div>
-        <p class="muted small">Quer mudar textos, fotos ou serviços? Fale com a DDS Inovação; ajustes avançados são feitos pela equipe.</p>
-        <a class="btn" target="_blank" rel="noopener" href="${NC.waLink(C.dds.whatsapp, "Olá DDS! Quero ajustar o meu mini site (" + c.company_name + ").")}">${ic("whatsapp", 18)} Pedir ajuste à DDS</a></div>`;
-    } else if (req) {
-      const idx = REQ_STEPS.findIndex((s) => s[0] === req.status);
-      const pub = S.notes.filter((n) => n.request_id === req.id && n.is_public);
-      body = `<div class="split"><div class="card"><h3>Andamento do seu mini site</h3><p class="muted small" style="margin-bottom:1rem">Solicitado em ${NC.fmtDate(req.created_at)}</p>
-        <div class="timeline">${REQ_STEPS.map((s, i) => `<div class="tl ${i < idx ? "done" : i === idx ? "cur" : ""}"><span class="d">${i < idx ? ic("check", 14) : ""}</span><div><b>${s[1]}</b>${i === idx ? "<small>Etapa atual</small>" : ""}</div></div>`).join("")}</div></div>
-        <div class="card"><h3>Mensagens da equipe</h3>${pub.length ? `<div class="feed">${pub.map((n) => `<div><span class="dot">${ic("sparkle", 16)}</span><span>${e(n.note)}<small>${NC.fmtDateTime(n.created_at)}</small></span></div>`).join("")}</div>` : `<div class="empty">Assim que houver novidades, elas aparecem aqui.</div>`}
-          <a class="btn block" style="margin-top:1rem" target="_blank" rel="noopener" href="${NC.waLink(C.dds.whatsapp, "Olá DDS! Sobre o mini site da " + c.company_name + ", quero enviar materiais.")}">${ic("whatsapp", 18)} Enviar fotos e materiais</a></div></div>`;
-    } else {
-      body = `<div class="card section">${ED.showcase(S.settings.minisite_models || [], c)}</div>
-        <div class="card"><h2>${e(txt.title || "Mini site profissional")}</h2><p class="muted" style="margin-top:.4rem">${e(txt.body || "")}</p>
-        <div class="benefits">
-          <div><b>🌐 Presença completa</b><span>Sobre, serviços, fotos, mapa e contato em um só lugar.</span></div>
-          <div><b>📱 Feito para celular</b><span>Rápido e bonito em qualquer tela.</span></div>
-          <div><b>🔗 Integra com sua tag</b><span>Sua tag pode abrir o mini site direto.</span></div>
-          <div><b>🛠️ Sob medida</b><span>Desenvolvido pela DDS Inovação.</span></div>
-        </div>
-        <p class="alert warn small">${ic("sparkle", 18)}<span>Serviço adicional e opcional, <b>não incluso</b> no plano da tag. A DDS combina com você orçamento e prazo.</span></p>
-        <h3 style="margin-top:1.2rem">Ou deixe sua solicitação aqui</h3>
-        <form class="stack" id="fReq">
-          <div class="grid2"><label>Segmento do negócio<input name="business_type" required placeholder="Ex.: confeitaria, salão, clínica"></label>
-          <label>Objetivo principal<select name="goals"><option>Receber mais contatos no WhatsApp</option><option>Mostrar meus produtos/serviços</option><option>Passar mais credibilidade</option><option>Vender online</option><option>Outro</option></select></label></div>
-          <label>Conte sobre o seu negócio<textarea name="business_description" required maxlength="2000" placeholder="O que você faz, para quem, diferenciais..."></textarea></label>
-          <label>Produtos ou serviços principais<textarea name="services_products" maxlength="2000"></textarea></label>
-          <div class="grid2"><label>Melhor contato<input name="contacts" placeholder="WhatsApp ou e-mail" value="${e(c.phone || c.email || "")}"></label>
-          <label>Sites que você gosta <small>(referências)</small><input name="reference_urls" placeholder="links separados por vírgula"></label></div>
-          <div><button class="btn primary">${ic("rocket", 18)} Enviar solicitação</button></div>
-        </form></div>`;
+        <div class="row"><a class="btn primary" target="_blank" rel="noopener" href="${e(c.minisite_url)}">${ic("eye", 18)} Abrir</a><button class="btn" id="toTag">${ic("tag", 18)} Fazer a tag abrir o mini site</button></div>
+        <a class="btn ghost" target="_blank" rel="noopener" href="${NC.waLink(C.dds.whatsapp, "Olá DDS! Quero ajustar o meu mini site (" + c.company_name + ").")}">${ic("whatsapp", 18)} Pedir ajuste à DDS</a></div>
+        <div class="card section" style="margin-top:1rem" id="sc"></div>`;
+      NC.$("#cpMs").onclick = () => NC.copy(c.minisite_url); NC.$("#toTag").onclick = () => go("tag");
+      ED.showcase(NC.$("#sc"), { mode: "client", c, price }); NC.$("#sc [data-self]") && NC.$("#sc [data-self]").remove();
+      return;
     }
-    v.innerHTML = `<div class="topbar"><div><h1>Mini site</h1><p class="muted">Um site completo para o seu negócio, criado pela DDS Inovação.</p></div></div>${body}`;
-    const cp = NC.$("#cpMs"); if (cp) cp.onclick = () => NC.copy(c.minisite_url);
-    const tt = NC.$("#toTag"); if (tt) tt.onclick = () => go("tag");
-    const f = NC.$("#fReq");
-    if (f) f.onsubmit = async (ev) => {
-      ev.preventDefault(); const btn = NC.$("button.primary", f); btn.disabled = true;
-      const row = { customer_id: c.id };
-      ["business_type", "goals", "business_description", "services_products", "contacts", "reference_urls"].forEach((k) => (row[k] = f[k].value.trim() || null));
-      const { data, error } = await NC.sb.from("nc_minisite_requests").insert(row).select().single();
-      btn.disabled = false;
-      if (error) return NC.err(error);
-      S.reqs.unshift(data); S.c.minisite_status = "requested";
-      NC.toast("Solicitação enviada! A DDS Inovação vai entrar em contato."); minisite(v);
-    };
+    const mine = S.leads.find((l) => l.ref_kind === "self" && l.status !== "lost");
+    v.innerHTML = `<div class="topbar"><div><h1>Mini site</h1><p class="muted">Um site completo para o seu negócio, criado pela DDS Inovação.</p></div></div>
+      ${mine ? `<div class="alert ok section">${ic("check", 18)}<span><b>Pedido enviado em ${NC.fmtDate(mine.created_at)}.</b> A DDS Inovação vai falar com você pelo WhatsApp para combinar os detalhes.</span></div>` : ""}
+      <div class="card" id="sc"></div>`;
+    ED.showcase(NC.$("#sc"), { mode: "client", c, price, onSelf: () => selfRequest(v) });
+  }
+  function selfRequest(v) {
+    const MS = window.NC_MS;
+    NC.modal({
+      title: "Quero um mini site",
+      body: `<form class="stack" id="fSelf"><p class="muted small">A DDS Inovação recebe seu pedido e fala com você pelo WhatsApp ${e(NC.fmtPhone(S.c.phone || ""))}.</p>
+        <label>Qual modelo mais combina com você?<select name="model"><option value="">Ainda não sei</option>${MS.models.map((m) => `<option value="${m.id}">${e(m.full)}</option>`).join("")}</select></label>
+        <label>Conte rapidinho sobre o seu negócio <small>(opcional)</small><input name="business" maxlength="160" placeholder="Ex.: confeitaria artesanal, atendo por encomenda"></label>
+        <a class="small" href="${e(MS.examplesUrl)}" target="_blank" rel="noopener">${ic("eye", 16)} Ver os modelos antes</a></form>`,
+      actions: [{ label: "Cancelar", cls: "ghost" }, { label: "Enviar pedido", cls: "primary", onClick: async (w) => {
+        const f = NC.$("#fSelf", w);
+        const { data, error } = await NC.sb.rpc("nc_self_lead", { p_model: f.model.value || null, p_business: f.business.value.trim() || null });
+        if (error || !data || !data.ok) { NC.err(error || { message: "Não foi possível enviar." }); return false; }
+        const m = MS.models.find((x) => x.id === f.model.value);
+        window.open(NC.waLink(C.dds.whatsapp, `Olá DDS! Sou cliente Nexcube 3D (${S.c.company_name}) e quero um mini site${m ? " no modelo " + m.full : ""}.`), "_blank", "noopener");
+        await loadLeads(); NC.toast("Pedido enviado! A DDS vai te chamar."); minisite(v);
+      } }]
+    });
+  }
+
+  /* ---------------- INDIQUE E GANHE ---------------- */
+  async function loadLeads() {
+    const [l, cm] = await Promise.all([
+      NC.sb.from("nc_ref_leads").select("*").eq("customer_id", S.c.id).order("created_at", { ascending: false }),
+      NC.sb.from("nc_commissions").select("*").eq("customer_id", S.c.id).eq("beneficiary", "client").order("created_at", { ascending: false })
+    ]);
+    S.leads = l.data || []; S.comms = cm.data || [];
+  }
+  const LEAD_ST = { new: ["Novo pedido", "info"], contact: ["Em conversa", "warn"], sold: ["Vendido ✅", "ok"], lost: ["Não fechou", ""] };
+  async function indique(v) {
+    await loadLeads();
+    const price = S.settings.minisite_price ? S.settings.minisite_price.value : null;
+    const pend = S.comms.filter((x) => x.status === "pending").reduce((a, x) => a + Number(x.amount), 0);
+    const paid = S.comms.filter((x) => x.status === "paid").reduce((a, x) => a + Number(x.amount), 0);
+    const refs = S.leads.filter((x) => x.ref_kind === "client");
+    v.innerHTML = `<div class="topbar"><div><h1>Indique e ganhe</h1><p class="muted">Ganhe 10% em cada mini site DDS vendido pelo seu link.</p></div></div>
+      <div class="cards">
+        <div class="kpi"><span>${ic("users", 16)} Indicações</span><b>${refs.length}</b><small>${refs.filter((x) => x.status === "sold").length} vendidas</small></div>
+        <div class="kpi"><span>${ic("clock", 16)} A receber</span><b>${ED.fmtMoney(pend)}</b><small>pago por Pix pela DDS</small></div>
+        <div class="kpi"><span>${ic("check", 16)} Já recebido</span><b>${ED.fmtMoney(paid)}</b><small>total pago</small></div>
+        <div class="kpi"><span>${ic("rocket", 16)} Você ganha por venda</span><b>${price ? ED.fmtMoney(price * 0.1) : "10%"}</b><small>${price ? "10% de " + ED.fmtMoney(price) : "do valor do mini site"}</small></div>
+      </div>
+      <div class="card section" id="sc"></div>
+      <div class="split">
+        <div class="card"><h3>Suas indicações</h3>${refs.length ? `<div class="feed">${refs.map((x) => `<div><span class="dot">${ic("user", 16)}</span><span class="grow">${e(x.name)} ${x.business ? `<span class="muted small">· ${e(x.business)}</span>` : ""}<small>${NC.fmtDate(x.created_at)}</small></span><span class="badge ${LEAD_ST[x.status][1]}">${LEAD_ST[x.status][0]}</span></div>`).join("")}</div>` : `<div class="empty">${ic("users", 30)}Ninguém pediu pelo seu link ainda. Compartilhe!</div>`}</div>
+        <div class="card"><h3>Suas comissões</h3>${S.comms.length ? `<div class="feed">${S.comms.map((x) => `<div><span class="dot">${ic(x.status === "paid" ? "check" : "clock", 16)}</span><span class="grow"><b>${ED.fmtMoney(x.amount)}</b> <span class="muted small">(${Number(x.percent)}%)</span><small>${x.status === "paid" ? "Pago em " + NC.fmtDate(x.paid_at) : "A receber"}</small></span></div>`).join("")}</div>` : `<div class="empty">Suas comissões aparecem aqui quando uma indicação virar venda.</div>`}
+          <p class="muted tiny" style="margin-top:.8rem">Comissão de 10% sobre mini sites vendidos pelo seu link, paga por Pix pela DDS Inovação. Compras feitas por você mesmo não geram comissão para você.</p></div>
+      </div>`;
+    ED.showcase(NC.$("#sc"), { mode: "client", c: S.c, price }); const sb = NC.$("#sc [data-self]"); if (sb) sb.remove();
   }
 
   // esconder a prévia lateral no mobile

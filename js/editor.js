@@ -234,31 +234,41 @@
   };
 
   /* ---------------- VITRINE DE MINI SITES (gancho de venda DDS) ---------------- */
-  ED.showcase = (models, c, { admin = false } = {}) => {
-    const C = window.NC_CONFIG;
-    const list = (models || []).filter((m) => m && m.url);
-    const name = c ? c.company_name : "";
-    const hire = NC.waLink(C.dds.whatsapp, admin
-      ? `Olá DDS! Sou da Nexcube 3D. O cliente ${name} quer contratar um mini site. Podemos conversar?`
-      : `Olá DDS! Sou cliente Nexcube 3D (${name}) e quero contratar um mini site. Vi os modelos no meu painel.`);
-    const cards = list.map((m, i) => `
-      <a class="ms-card" href="${e(m.url)}" target="_blank" rel="noopener" style="--mc:${e(m.color || "#6a3bff")};--d:${i * 0.08}s">
-        <div class="ms-shot"><div class="ms-bar"><i></i><i></i><i></i><span>${e((m.url || "").replace(/^https?:\/\//, "").replace(/\/$/, ""))}</span></div>
-          <div class="ms-frame"><div class="ms-ph">${ic("globe", 34)}</div><iframe src="${e(m.url)}" loading="lazy" tabindex="-1" aria-hidden="true" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe></div></div>
-        <div class="ms-info"><div><b>${e(m.title)}</b><small>${e(m.segment || "")}</small></div><span class="ms-open">Ver modelo ${ic("eye", 16)}</span></div>
-      </a>`).join("");
-    return `<div class="ms-show">
-      <div class="ms-head">
-        <div><span class="ms-kicker">${ic("sparkle", 16)} Desenvolvido pela DDS Inovação</span>
-          <h2>${admin ? "Mostre ao cliente: mini sites prontos para vender" : "Seu negócio com um site profissional"}</h2>
-          <p class="muted">${admin ? "Abra os modelos junto com o cliente. Gostou? Chame a DDS e, depois de pronto, cole o link abaixo." : "Veja modelos reais feitos pela DDS. Toque em um modelo para abrir."}</p></div>
+  ED.fmtMoney = (v) => (v == null || v === "" ? null : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+  ED.refUrl = (code) => `${window.NC_CONFIG.site}/indica/${code}`;
+  /* mode: 'admin' (NexCube) | 'client' (cliente da tag) */
+  ED.showcase = (root, { mode, c, price, onSelf }) => {
+    const MS = window.NC_MS || { models: [] };
+    const pick = ["pizzaria", "salao", "barbearia", "dentista", "academia", "petshop", "oficina", "imobiliaria"];
+    const teaser = pick.map((id) => MS.models.find((m) => m.id === id)).filter(Boolean);
+    const money = ED.fmtMoney(price);
+    const myRef = mode === "admin" ? ED.refUrl("nexcube") : c && c.ref_code ? ED.refUrl(c.ref_code) : null;
+    root.innerHTML = `<div class="ms-show">
+      <div class="ms-hero">
+        <div class="ms-hero-txt">
+          <span class="ms-kicker">${ic("sparkle", 16)} Mini site DDS · 30 modelos prontos</span>
+          <h2>${mode === "admin" ? "Venda mini sites e ganhe 30% em cada um" : "Um site profissional para o seu negócio"}</h2>
+          <p class="muted">${mode === "admin" ? "Mostre os modelos ao cliente. Toda venda que sai do seu link rende 30% para a Nexcube." : "Escolha entre 30 modelos por ramo: pizzaria, salão, clínica, oficina, imobiliária e muito mais."}</p>
+          <div class="ms-price">${money ? `<small>Pagamento único</small><b>${money}</b>` : `<small>Preço</small><b>sob consulta</b>`}</div>
+          <div class="ms-cta">
+            <a class="btn primary" href="${e(MS.examplesUrl)}" target="_blank" rel="noopener">${ic("eye", 18)} Ver os 30 modelos</a>
+            ${mode === "client" ? `<button class="btn" data-self>${ic("rocket", 18)} Quero um para mim</button>` : ""}
+          </div>
+        </div>
+        <a class="ms-mosaic" href="${e(MS.examplesUrl)}" target="_blank" rel="noopener" aria-label="Ver modelos">
+          ${teaser.map((m, i) => `<figure style="--d:${i * 0.06}s"><img src="${e(MS.cover(m.cover, 360))}" alt="" loading="lazy"><figcaption>${e(m.label)}</figcaption></figure>`).join("")}
+        </a>
       </div>
-      <div class="ms-grid">${cards || `<div class="empty">Nenhum modelo cadastrado ainda.</div>`}</div>
-      <div class="ms-cta">
-        <a class="btn primary" href="${hire}" target="_blank" rel="noopener">${ic("whatsapp", 18)} ${admin ? "Chamar a DDS para contratar" : "Quero contratar com a DDS"}</a>
-        <a class="btn" href="${e(C.dds.minisite)}" target="_blank" rel="noopener">${ic("rocket", 18)} Conhecer o Mini Site DDS</a>
-        ${admin && c && c.phone ? `<a class="btn" target="_blank" rel="noopener" href="${NC.waLink(c.phone, "Olá! Separei alguns modelos de mini site profissional para você ver:\n\n" + list.map((m) => "• " + m.title + ": " + m.url).join("\n") + "\n\nGostando de algum, a DDS Inovação faz o seu sob medida.")}">${ic("whatsapp", 18)} Enviar modelos ao cliente</a>` : ""}
-      </div></div>`;
+      ${myRef ? `<div class="ms-ref">
+        <div class="ms-ref-ic">${ic("users", 22)}</div>
+        <div class="grow"><b>${mode === "admin" ? "Link de indicação da Nexcube" : "Indique e ganhe 10%"}</b>
+          <p class="muted small">${mode === "admin" ? "Divulgue este link: quem pedir por ele gera 30% de comissão para a Nexcube." : "Envie seu link para outros negócios. A cada mini site vendido por ele, você ganha 10% (pago por Pix)."}</p>
+          <div class="url-line" style="margin-top:.5rem"><span>${e(myRef)}</span><button class="icon-btn" data-cp aria-label="Copiar">${ic("copy", 18)}</button></div>
+          <div class="row" style="margin-top:.6rem"><a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent("Conhece os mini sites profissionais da DDS Inovação? São 30 modelos prontos por ramo. Veja e peça o seu: " + myRef)}">${ic("whatsapp", 16)} Compartilhar no WhatsApp</a></div>
+        </div></div>` : ""}
+    </div>`;
+    const cp = NC.$("[data-cp]", root); if (cp) cp.onclick = () => NC.copy(myRef, "Link de indicação copiado!");
+    const sf = NC.$("[data-self]", root); if (sf && onSelf) sf.onclick = onSelf;
   };
 
   /* ---------------- PASSO A PASSO: GRAVAR A TAG NFC ---------------- */

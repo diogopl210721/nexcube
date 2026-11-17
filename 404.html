@@ -19,6 +19,8 @@
 <script src="/js/config.js"></script>
 <script src="/js/core.js"></script>
 <script src="/js/public.js"></script>
+<script src="/js/minisite-models.js"></script>
+<script src="/js/indica.js"></script>
 <script>
 /* Roteador público (GitHub Pages entrega este arquivo para qualquer caminho que não existe):
    /r/NC-XXXX       -> QR Code / NFC dinâmico: resolve a tag e redireciona
@@ -56,6 +58,10 @@
       if (data.type === "url" && /^https:\/\//.test(data.url)) return location.replace(data.url);
       history.replaceState(null, "", "/" + data.slug);
       return showPage(data.slug, data.tag);
+    }
+    if (parts[0] === "indica" && parts[1]) {
+      document.body.style.background = "#0b0a18";
+      return NC.renderIndica(app, parts[1].toLowerCase());
     }
     if (parts.length === 1 && /^[a-z0-9]([a-z0-9-]{0,48}[a-z0-9])?$/i.test(parts[0])) {
       return showPage(parts[0].toLowerCase(), params.get("t"));

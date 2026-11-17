@@ -9,6 +9,7 @@
     { id: "clientes", label: "Clientes", icon: "users" },
     { id: "tags", label: "Tags e QR Codes", icon: "tag" },
     { id: "minisites", label: "Mini sites", icon: "rocket" },
+    { id: "indicacoes", label: "Indicações e comissões", icon: "users" },
     { id: "config", label: "Configurações", icon: "gear" }
   ];
   const ST = { active: ["Ativo", "ok"], pending: ["Pendente", "warn"], suspended: ["Suspenso", "bad"] };
@@ -102,7 +103,7 @@
     NC.$$("[data-nav]").forEach((a) => a.classList.toggle("on", a.dataset.nav === (id === "cliente" ? "clientes" : id)));
     NC.$("#side") && NC.$("#side").classList.remove("open");
     const v = NC.$("#view"); v.innerHTML = `<div class="center-msg"><div class="spin dark"></div></div>`; window.scrollTo(0, 0);
-    const views = { dashboard, clientes, cliente: () => cliente(v, arg), tags, minisites, config };
+    const views = { dashboard, clientes, cliente: () => cliente(v, arg), tags, minisites, indicacoes, config };
     (views[id] || dashboard)(v, arg);
   }
 
@@ -391,7 +392,7 @@
 
     async function tMinisite() {
       const reqs = rq.data || [];
-      const { data: md } = await NC.sb.from("nc_settings").select("value").eq("key", "minisite_models").maybeSingle();
+      const { data: md } = await NC.sb.from("nc_settings").select("value").eq("key", "minisite_price").maybeSingle();
       const pub = c.minisite_status === "published" && c.minisite_url;
       T.innerHTML = `
         <div class="ms-steps">
@@ -402,7 +403,7 @@
         ${pub ? `<div class="card section ms-live"><span class="badge ok">${ic("check", 14)} Mini site publicado</span>
             <div class="url-line" style="margin-top:.7rem"><span>${e(c.minisite_url)}</span><a class="icon-btn" href="${e(c.minisite_url)}" target="_blank" rel="noopener">${ic("eye", 18)}</a></div>
             <p class="muted small" style="margin-top:.5rem">O cliente já pode apontar a tag para o mini site em Minha tag.</p></div>`
-          : `<div class="card section">${ED.showcase(md ? md.value : [], c, { admin: true })}</div>`}
+          : `<div class="card section" id="scA"></div>`}
         <div class="split">
           <div class="card stack"><h3 style="margin:0">${ic("rocket")} ${pub ? "Dados do mini site" : "Cliente contratou? Cole o link aqui"}</h3>
             <label>Situação<select id="msS"><option value="none">Não contratado</option><option value="requested">Interessado / em negociação</option><option value="in_progress">Contratado, em desenvolvimento</option><option value="published">Publicado</option></select></label>
@@ -411,6 +412,7 @@
             <div><button class="btn primary" id="msSave">${ic("check", 18)} Salvar</button></div></div>
           <div class="card"><h3>Solicitações do cliente</h3>${reqs.length ? `<div class="feed">${reqs.map((r) => `<div><span class="dot">${ic("rocket", 16)}</span><span><b>${e(RQ[r.status])}</b> · ${e(r.business_type || "")}<small>${NC.fmtDateTime(r.created_at)} · <a href="#minisites/${r.id}">abrir</a></small></span></div>`).join("")}</div>` : `<div class="empty">O cliente ainda não pediu pelo painel.</div>`}</div>
         </div>`;
+      const scA = NC.$("#scA"); if (scA) ED.showcase(scA, { mode: "admin", c, price: md && md.value ? md.value.value : null });
       const sel = NC.$("#msS"), inp = NC.$("#msU");
       sel.value = c.minisite_status;
       inp.addEventListener("input", () => { if (inp.value.trim()) sel.value = "published"; });
@@ -618,22 +620,57 @@
     });
   }
 
+  /* ======================= INDICAÇÕES E COMISSÕES ======================= */
+  const LEAD_ST = { new: ["Novo pedido", "info"], contact: ["Em conversa", "warn"], sold: ["Vendido", "ok"], lost: ["Não fechou", ""] };
+  const KIND = { nexcube: "Link da Nexcube", client: "Indicação de cliente", self: "Cliente comprou p/ si" };
+  async function indicacoes(v) {
+    await loadCustomers();
+    const [l, sl, cm, pr] = await Promise.all([
+      NC.sb.from("nc_ref_leads").select("*").order("created_at", { ascending: false }).limit(300),
+      NC.sb.from("nc_sales").select("*").order("sold_at", { ascending: false }).limit(300),
+      NC.sb.from("nc_commissions").select("*").order("created_at", { ascending: false }).limit(600),
+      NC.sb.from("nc_settings").select("value").eq("key", "minisite_price").maybeSingle()
+    ]);
+    const leads = l.data || [], sales = sl.data || [], comms = cm.data || [];
+    const price = pr.data && pr.data.value ? pr.data.value.value : null;
+    const sum = (arr) => arr.reduce((a, x) => a + Number(x.amount), 0);
+    const nx = comms.filter((x) => x.beneficiary === "nexcube"), cl = comms.filter((x) => x.beneficiary === "client");
+    v.innerHTML = `<div class="topbar"><div><h1>Indicações e comissões</h1><p class="muted">Mini sites DDS vendidos pela rede Nexcube · Nexcube 30% · cliente que indicou 10%</p></div></div>
+      <div class="cards">
+        <div class="kpi"><span>${ic("users", 16)} Pedidos</span><b>${leads.length}</b><small>${leads.filter((x) => x.status === "new").length} novos</small></div>
+        <div class="kpi"><span>${ic("rocket", 16)} Vendas</span><b>${sales.length}</b><small>${ED.fmtMoney(sales.reduce((a, x) => a + Number(x.value), 0))} vendidos</small></div>
+        <div class="kpi"><span>${ic("clock", 16)} Nexcube a receber</span><b>${ED.fmtMoney(sum(nx.filter((x) => x.status === "pending")))}</b><small>30% · pago por Pix pela DDS</small></div>
+        <div class="kpi"><span>${ic("check", 16)} Nexcube recebido</span><b>${ED.fmtMoney(sum(nx.filter((x) => x.status === "paid")))}</b><small>total pago</small></div>
+        <div class="kpi"><span>${ic("users", 16)} Clientes a receber</span><b>${ED.fmtMoney(sum(cl.filter((x) => x.status === "pending")))}</b><small>10% dos que indicaram</small></div>
+      </div>
+      <div class="card section" id="scN"></div>
+      <div class="card section"><h3>Pedidos de mini site</h3><div class="tbl-wrap resp"><table><thead><tr><th>Data</th><th>Nome</th><th>WhatsApp</th><th>Origem</th><th>Modelo</th><th>Situação</th></tr></thead><tbody>
+        ${leads.length ? leads.map((x) => `<tr><td data-label="Data" class="small">${NC.fmtDate(x.created_at)}</td><td class="full" data-label="Nome"><b>${e(x.name)}</b>${x.business ? `<div class="muted tiny">${e(x.business)}</div>` : ""}</td>
+          <td data-label="WhatsApp"><a target="_blank" rel="noopener" href="${NC.waLink(x.whatsapp)}">${e(NC.fmtPhone(x.whatsapp))}</a></td>
+          <td data-label="Origem" class="small">${e(KIND[x.ref_kind])}${x.customer_id ? `<div class="muted tiny">${e(custName(x.customer_id))}</div>` : ""}</td>
+          <td data-label="Modelo" class="small">${e(((window.NC_MS.models.find((m) => m.id === x.model)) || {}).label || "—")}</td>
+          <td data-label="Situação"><span class="badge ${LEAD_ST[x.status][1]}">${LEAD_ST[x.status][0]}</span></td></tr>`).join("") : `<tr><td colspan="6"><div class="empty">${ic("users", 30)}Nenhum pedido ainda. Divulgue o link de indicação.</div></td></tr>`}
+      </tbody></table></div></div>
+      <div class="card"><h3>Comissões</h3><div class="tbl-wrap resp"><table><thead><tr><th>Venda</th><th>Para</th><th>%</th><th>Valor</th><th>Situação</th></tr></thead><tbody>
+        ${comms.length ? comms.map((x) => { const sa = sales.find((s2) => s2.id === x.sale_id) || {}; return `<tr><td class="full" data-label="Venda"><b>${e(sa.buyer_name || "—")}</b><div class="muted tiny">${NC.fmtDate(sa.sold_at)} · ${ED.fmtMoney(sa.value)}</div></td>
+          <td data-label="Para">${x.beneficiary === "nexcube" ? "Nexcube 3D" : e(custName(x.customer_id))}</td><td data-label="%">${Number(x.percent)}%</td><td data-label="Valor"><b>${ED.fmtMoney(x.amount)}</b></td>
+          <td data-label="Situação"><span class="badge ${x.status === "paid" ? "ok" : "warn"}">${x.status === "paid" ? "Pago " + NC.fmtDate(x.paid_at) : "A receber"}</span></td></tr>`; }).join("") : `<tr><td colspan="5"><div class="empty">As comissões aparecem quando a DDS registrar uma venda.</div></td></tr>`}
+      </tbody></table></div><p class="muted tiny" style="margin-top:.8rem">As vendas são confirmadas e pagas por Pix pela DDS Inovação.</p></div>`;
+    ED.showcase(NC.$("#scN"), { mode: "admin", c: null, price });
+  }
+
   /* ======================= CONFIGURAÇÕES ======================= */
   async function config(v) {
     const [st, ad] = await Promise.all([NC.sb.from("nc_settings").select("*"), NC.sb.from("nc_profiles").select("*").eq("role", "superadmin").order("created_at")]);
     const set = {}; (st.data || []).forEach((x) => (set[x.key] = x.value));
     const p = set.platform || {}, m = set.minisite_text || {};
-    let models = Array.isArray(set.minisite_models) ? set.minisite_models.slice() : [];
+
     v.innerHTML = `<div class="topbar"><div><h1>Configurações</h1></div></div>
       <div class="split"><div class="stack">
         <form class="card stack" id="fP"><h3 style="margin:0">Plataforma</h3>
           <div class="grid2"><label>Nome da plataforma<input name="name" value="${e(p.name || "Nexcube 3D")}"></label><label>Domínio público<input name="domain" value="${e(p.domain || "www.nexcube3d.com.br")}" disabled></label></div>
           <div class="grid2"><label>WhatsApp de suporte<input name="support_whatsapp" value="${e(p.support_whatsapp || "")}"></label><label>E-mail de suporte<input name="support_email" type="email" value="${e(p.support_email || "")}"></label></div>
           <div><button class="btn primary">Salvar</button></div></form>
-        <div class="card stack"><div class="row between"><h3 style="margin:0">${ic("rocket")} Modelos de mini site (vitrine)</h3><button class="btn sm" id="mAdd">${ic("plus", 16)} Adicionar</button></div>
-          <p class="muted small">Aparecem para a NexCube e para os clientes como exemplos para vender o mini site DDS.</p>
-          <div id="mList" class="stack" style="gap:.6rem"></div>
-          <div><button class="btn primary" id="mSave">Salvar modelos</button></div></div>
         <form class="card stack" id="fM"><h3 style="margin:0">Texto comercial do mini site</h3>
           <label>Título<input name="title" value="${e(m.title || "")}"></label><label>Texto<textarea name="body">${e(m.body || "")}</textarea></label>
           <div><button class="btn primary">Salvar</button></div></form></div>
@@ -643,23 +680,6 @@
             <div class="grid2"><label>Telefone<input name="phone" type="tel" required></label><label>Repita o telefone<input name="phone2" type="tel" required></label></div>
             <div class="grid2">${NC.pinInput("pin", "PIN (4 números)")}${NC.pinInput("pin2", "Repita o PIN")}</div>
             <button class="btn">${ic("plus", 18)} Adicionar administrador</button></form></div></div>`;
-    const drawModels = () => {
-      NC.$("#mList").innerHTML = models.length ? models.map((md, i) => `<div class="model-row">
-        <input data-k="title" data-i="${i}" placeholder="Nome" value="${e(md.title || "")}">
-        <input data-k="segment" data-i="${i}" placeholder="Segmento" value="${e(md.segment || "")}">
-        <input data-k="url" data-i="${i}" placeholder="https://..." value="${e(md.url || "")}">
-        <input type="color" data-k="color" data-i="${i}" value="${e(md.color || "#6a3bff")}">
-        <button class="icon-btn danger" data-rm="${i}" aria-label="Remover">${ic("trash", 18)}</button></div>`).join("") : `<div class="empty">Nenhum modelo.</div>`;
-      NC.$$("#mList input").forEach((inp) => (inp.oninput = () => (models[inp.dataset.i][inp.dataset.k] = inp.value)));
-      NC.$$("#mList [data-rm]").forEach((b) => (b.onclick = () => { models.splice(+b.dataset.rm, 1); drawModels(); }));
-    };
-    drawModels();
-    NC.$("#mAdd").onclick = () => { models.push({ title: "", segment: "", url: "", color: "#6a3bff" }); drawModels(); };
-    NC.$("#mSave").onclick = async () => {
-      const clean = []; for (const md of models) { if (!md.title && !md.url) continue; const u = NC.normalizeUrl(md.url); if (!u || !md.title) return NC.toast("Cada modelo precisa de nome e link https válido.", "err"); clean.push({ title: md.title.trim(), segment: (md.segment || "").trim(), url: u, color: md.color || "#6a3bff" }); }
-      const { error } = await NC.sb.from("nc_settings").upsert({ key: "minisite_models", value: clean, updated_at: new Date().toISOString() });
-      if (error) return NC.err(error); models = clean; drawModels(); NC.toast("Modelos salvos!");
-    };
     NC.$("#fP").onsubmit = async (x) => { x.preventDefault(); const f = x.target; const val = { ...p, name: f.name.value.trim(), support_whatsapp: NC.digits(f.support_whatsapp.value), support_email: f.support_email.value.trim() };
       const { error } = await NC.sb.from("nc_settings").upsert({ key: "platform", value: val, updated_at: new Date().toISOString() }); if (error) return NC.err(error); NC.toast("Configurações salvas."); };
     NC.$("#fM").onsubmit = async (x) => { x.preventDefault(); const f = x.target;
