@@ -74,7 +74,7 @@
           <button type="button" class="pp-act" data-qr aria-label="Mostrar QR Code">${NC.icon("eye", 18)} QR Code</button>
         </div>`}
         ${hasContact ? `<div class="pp-contact">${data.phone ? `<a href="tel:+${e(NC.waNumber(data.phone))}">${NC.icon("phone", 15)} ${e(data.phone)}</a>` : ""}${data.email ? `<a href="mailto:${e(data.email)}">${NC.icon("email", 15)} ${e(data.email)}</a>` : ""}</div>` : ""}
-        <footer class="pp-foot2"><a href="${e(C.site)}" target="_blank" rel="noopener"><img src="/assets/logo-cube.png" alt="">${e(C.footer)}</a></footer>
+        <footer class="pp-foot2"><a href="${e(C.site)}" target="_blank" rel="noopener"><img src="/assets/logo-cube.png" alt="">${e(C.footer)}</a>${opts && opts.preview ? "" : `<a class="pp-owner" href="/painel/">${NC.icon("lock", 13)} Área do dono</a>`}</footer>
       </main>
     </div>`;
 
