@@ -233,6 +233,34 @@
     draw();
   };
 
+  /* ---------------- VITRINE DE MINI SITES (gancho de venda DDS) ---------------- */
+  ED.showcase = (models, c, { admin = false } = {}) => {
+    const C = window.NC_CONFIG;
+    const list = (models || []).filter((m) => m && m.url);
+    const name = c ? c.company_name : "";
+    const hire = NC.waLink(C.dds.whatsapp, admin
+      ? `Olá DDS! Sou da Nexcube 3D. O cliente ${name} quer contratar um mini site. Podemos conversar?`
+      : `Olá DDS! Sou cliente Nexcube 3D (${name}) e quero contratar um mini site. Vi os modelos no meu painel.`);
+    const cards = list.map((m, i) => `
+      <a class="ms-card" href="${e(m.url)}" target="_blank" rel="noopener" style="--mc:${e(m.color || "#6a3bff")};--d:${i * 0.08}s">
+        <div class="ms-shot"><div class="ms-bar"><i></i><i></i><i></i><span>${e((m.url || "").replace(/^https?:\/\//, "").replace(/\/$/, ""))}</span></div>
+          <div class="ms-frame"><div class="ms-ph">${ic("globe", 34)}</div><iframe src="${e(m.url)}" loading="lazy" tabindex="-1" aria-hidden="true" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe></div></div>
+        <div class="ms-info"><div><b>${e(m.title)}</b><small>${e(m.segment || "")}</small></div><span class="ms-open">Ver modelo ${ic("eye", 16)}</span></div>
+      </a>`).join("");
+    return `<div class="ms-show">
+      <div class="ms-head">
+        <div><span class="ms-kicker">${ic("sparkle", 16)} Desenvolvido pela DDS Inovação</span>
+          <h2>${admin ? "Mostre ao cliente: mini sites prontos para vender" : "Seu negócio com um site profissional"}</h2>
+          <p class="muted">${admin ? "Abra os modelos junto com o cliente. Gostou? Chame a DDS e, depois de pronto, cole o link abaixo." : "Veja modelos reais feitos pela DDS. Toque em um modelo para abrir."}</p></div>
+      </div>
+      <div class="ms-grid">${cards || `<div class="empty">Nenhum modelo cadastrado ainda.</div>`}</div>
+      <div class="ms-cta">
+        <a class="btn primary" href="${hire}" target="_blank" rel="noopener">${ic("whatsapp", 18)} ${admin ? "Chamar a DDS para contratar" : "Quero contratar com a DDS"}</a>
+        <a class="btn" href="${e(C.dds.minisite)}" target="_blank" rel="noopener">${ic("rocket", 18)} Conhecer o Mini Site DDS</a>
+        ${admin && c && c.phone ? `<a class="btn" target="_blank" rel="noopener" href="${NC.waLink(c.phone, "Olá! Separei alguns modelos de mini site profissional para você ver:\n\n" + list.map((m) => "• " + m.title + ": " + m.url).join("\n") + "\n\nGostando de algum, a DDS Inovação faz o seu sob medida.")}">${ic("whatsapp", 18)} Enviar modelos ao cliente</a>` : ""}
+      </div></div>`;
+  };
+
   /* ---------------- PASSO A PASSO: GRAVAR A TAG NFC ---------------- */
   ED.writeGuide = (code) => {
     const url = NC.tagUrl(code);

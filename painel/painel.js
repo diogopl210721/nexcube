@@ -201,17 +201,15 @@
         <div class="card"><h3>Mensagens da equipe</h3>${pub.length ? `<div class="feed">${pub.map((n) => `<div><span class="dot">${ic("sparkle", 16)}</span><span>${e(n.note)}<small>${NC.fmtDateTime(n.created_at)}</small></span></div>`).join("")}</div>` : `<div class="empty">Assim que houver novidades, elas aparecem aqui.</div>`}
           <a class="btn block" style="margin-top:1rem" target="_blank" rel="noopener" href="${NC.waLink(C.dds.whatsapp, "Olá DDS! Sobre o mini site da " + c.company_name + ", quero enviar materiais.")}">${ic("whatsapp", 18)} Enviar fotos e materiais</a></div></div>`;
     } else {
-      body = `${ddsAd()}
-        <div class="card" style="margin-top:1rem"><h2>${e(txt.title || "Mini site profissional")}</h2><p class="muted" style="margin-top:.4rem">${e(txt.body || "")}</p>
+      body = `<div class="card section">${ED.showcase(S.settings.minisite_models || [], c)}</div>
+        <div class="card"><h2>${e(txt.title || "Mini site profissional")}</h2><p class="muted" style="margin-top:.4rem">${e(txt.body || "")}</p>
         <div class="benefits">
           <div><b>🌐 Presença completa</b><span>Sobre, serviços, fotos, mapa e contato em um só lugar.</span></div>
           <div><b>📱 Feito para celular</b><span>Rápido e bonito em qualquer tela.</span></div>
           <div><b>🔗 Integra com sua tag</b><span>Sua tag pode abrir o mini site direto.</span></div>
-          <div><b>🛠️ Feito por especialistas</b><span>Desenvolvido sob medida pela DDS Inovação.</span></div>
+          <div><b>🛠️ Sob medida</b><span>Desenvolvido pela DDS Inovação.</span></div>
         </div>
-        <p class="alert warn small">${ic("sparkle", 18)}<span>Serviço adicional e opcional, <b>não incluso</b> no plano da tag. Após o pedido, a DDS entra em contato com briefing, orçamento e prazo.</span></p>
-        <div class="row" style="margin:1rem 0"><a class="btn primary" href="${e(C.dds.minisite)}" target="_blank" rel="noopener">${ic("rocket", 18)} Conhecer o Mini Site DDS</a>
-          <a class="btn" target="_blank" rel="noopener" href="${NC.waLink(C.dds.whatsapp, "Olá DDS! Sou cliente Nexcube 3D (" + c.company_name + ") e quero um mini site.")}">${ic("whatsapp", 18)} Falar com a DDS</a></div>
+        <p class="alert warn small">${ic("sparkle", 18)}<span>Serviço adicional e opcional, <b>não incluso</b> no plano da tag. A DDS combina com você orçamento e prazo.</span></p>
         <h3 style="margin-top:1.2rem">Ou deixe sua solicitação aqui</h3>
         <form class="stack" id="fReq">
           <div class="grid2"><label>Segmento do negócio<input name="business_type" required placeholder="Ex.: confeitaria, salão, clínica"></label>

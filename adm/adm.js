@@ -387,21 +387,38 @@
       sub("perfil"); refresh();
     }
 
-    function tMinisite() {
+    async function tMinisite() {
       const reqs = rq.data || [];
-      T.innerHTML = `<div class="split"><div class="card stack"><h3 style="margin:0">Mini site do cliente</h3>
-          <label>Status<select id="msS"><option value="none">Não contratado</option><option value="requested">Solicitado</option><option value="in_progress">Em desenvolvimento</option><option value="published">Publicado</option></select></label>
-          <label>URL do mini site publicado<input id="msU" placeholder="https://..." value="${e(c.minisite_url || "")}"></label>
-          <p class="muted small">Ao publicar, o cliente pode apontar a tag para o mini site.</p>
-          <div><button class="btn primary" id="msSave">${ic("check", 18)} Salvar</button></div></div>
-        <div class="card"><h3>Solicitações</h3>${reqs.length ? `<div class="feed">${reqs.map((r) => `<div><span class="dot">${ic("rocket", 16)}</span><span><b>${e(RQ[r.status])}</b> · ${e(r.business_type || "")}<small>${NC.fmtDateTime(r.created_at)} · <a href="#minisites/${r.id}">abrir</a></small></span></div>`).join("")}</div>` : `<div class="empty">Nenhuma solicitação.</div>`}</div></div>`;
-      NC.$("#msS").value = c.minisite_status;
+      const { data: md } = await NC.sb.from("nc_settings").select("value").eq("key", "minisite_models").maybeSingle();
+      const pub = c.minisite_status === "published" && c.minisite_url;
+      T.innerHTML = `
+        <div class="ms-steps">
+          <div class="${pub ? "done" : "on"}"><b>1</b><span>Mostrar modelos</span></div>
+          <div class="${pub ? "done" : c.minisite_status !== "none" ? "on" : ""}"><b>2</b><span>Contratar com a DDS</span></div>
+          <div class="${pub ? "done" : ""}"><b>3</b><span>Colar o link e publicar</span></div>
+        </div>
+        ${pub ? `<div class="card section ms-live"><span class="badge ok">${ic("check", 14)} Mini site publicado</span>
+            <div class="url-line" style="margin-top:.7rem"><span>${e(c.minisite_url)}</span><a class="icon-btn" href="${e(c.minisite_url)}" target="_blank" rel="noopener">${ic("eye", 18)}</a></div>
+            <p class="muted small" style="margin-top:.5rem">O cliente já pode apontar a tag para o mini site em Minha tag.</p></div>`
+          : `<div class="card section">${ED.showcase(md ? md.value : [], c, { admin: true })}</div>`}
+        <div class="split">
+          <div class="card stack"><h3 style="margin:0">${ic("rocket")} ${pub ? "Dados do mini site" : "Cliente contratou? Cole o link aqui"}</h3>
+            <label>Situação<select id="msS"><option value="none">Não contratado</option><option value="requested">Interessado / em negociação</option><option value="in_progress">Contratado, em desenvolvimento</option><option value="published">Publicado</option></select></label>
+            <label>Link do mini site<input id="msU" placeholder="https://..." value="${e(c.minisite_url || "")}" inputmode="url"></label>
+            <p class="muted small">Ao colar o link, a situação muda para <b>Publicado</b> e o cliente poderá apontar a tag para o mini site.</p>
+            <div><button class="btn primary" id="msSave">${ic("check", 18)} Salvar</button></div></div>
+          <div class="card"><h3>Solicitações do cliente</h3>${reqs.length ? `<div class="feed">${reqs.map((r) => `<div><span class="dot">${ic("rocket", 16)}</span><span><b>${e(RQ[r.status])}</b> · ${e(r.business_type || "")}<small>${NC.fmtDateTime(r.created_at)} · <a href="#minisites/${r.id}">abrir</a></small></span></div>`).join("")}</div>` : `<div class="empty">O cliente ainda não pediu pelo painel.</div>`}</div>
+        </div>`;
+      const sel = NC.$("#msS"), inp = NC.$("#msU");
+      sel.value = c.minisite_status;
+      inp.addEventListener("input", () => { if (inp.value.trim()) sel.value = "published"; });
       NC.$("#msSave").onclick = async () => {
-        const status = NC.$("#msS").value; let url = NC.$("#msU").value.trim();
-        if (url) { url = NC.normalizeUrl(url); if (!url) return NC.toast("URL inválida.", "err"); } else url = null;
-        if (status === "published" && !url) return NC.toast("Informe a URL para publicar.", "err");
+        const status = sel.value; let url = inp.value.trim();
+        if (url) { url = NC.normalizeUrl(url); if (!url) return NC.toast("Link inválido. Use https://", "err"); } else url = null;
+        if (status === "published" && !url) return NC.toast("Cole o link do mini site para publicar.", "err");
         const { error } = await NC.sb.from("nc_customers").update({ minisite_status: status, minisite_url: url }).eq("id", c.id);
-        if (error) return NC.err(error); c.minisite_status = status; c.minisite_url = url; NC.toast("Mini site atualizado.");
+        if (error) return NC.err(error); c.minisite_status = status; c.minisite_url = url;
+        NC.toast(status === "published" ? "Mini site publicado e vinculado ao cliente! 🎉" : "Mini site atualizado."); tMinisite();
       };
     }
 
@@ -593,12 +610,17 @@
     const [st, ad] = await Promise.all([NC.sb.from("nc_settings").select("*"), NC.sb.from("nc_profiles").select("*").eq("role", "superadmin").order("created_at")]);
     const set = {}; (st.data || []).forEach((x) => (set[x.key] = x.value));
     const p = set.platform || {}, m = set.minisite_text || {};
+    let models = Array.isArray(set.minisite_models) ? set.minisite_models.slice() : [];
     v.innerHTML = `<div class="topbar"><div><h1>Configurações</h1></div></div>
       <div class="split"><div class="stack">
         <form class="card stack" id="fP"><h3 style="margin:0">Plataforma</h3>
           <div class="grid2"><label>Nome da plataforma<input name="name" value="${e(p.name || "Nexcube 3D")}"></label><label>Domínio público<input name="domain" value="${e(p.domain || "www.nexcube3d.com.br")}" disabled></label></div>
           <div class="grid2"><label>WhatsApp de suporte<input name="support_whatsapp" value="${e(p.support_whatsapp || "")}"></label><label>E-mail de suporte<input name="support_email" type="email" value="${e(p.support_email || "")}"></label></div>
           <div><button class="btn primary">Salvar</button></div></form>
+        <div class="card stack"><div class="row between"><h3 style="margin:0">${ic("rocket")} Modelos de mini site (vitrine)</h3><button class="btn sm" id="mAdd">${ic("plus", 16)} Adicionar</button></div>
+          <p class="muted small">Aparecem para a NexCube e para os clientes como exemplos para vender o mini site DDS.</p>
+          <div id="mList" class="stack" style="gap:.6rem"></div>
+          <div><button class="btn primary" id="mSave">Salvar modelos</button></div></div>
         <form class="card stack" id="fM"><h3 style="margin:0">Texto comercial do mini site</h3>
           <label>Título<input name="title" value="${e(m.title || "")}"></label><label>Texto<textarea name="body">${e(m.body || "")}</textarea></label>
           <div><button class="btn primary">Salvar</button></div></form></div>
@@ -608,6 +630,23 @@
             <div class="grid2"><label>Telefone<input name="phone" type="tel" required></label><label>Repita o telefone<input name="phone2" type="tel" required></label></div>
             <div class="grid2">${NC.pinInput("pin", "PIN (4 números)")}${NC.pinInput("pin2", "Repita o PIN")}</div>
             <button class="btn">${ic("plus", 18)} Adicionar administrador</button></form></div></div>`;
+    const drawModels = () => {
+      NC.$("#mList").innerHTML = models.length ? models.map((md, i) => `<div class="model-row">
+        <input data-k="title" data-i="${i}" placeholder="Nome" value="${e(md.title || "")}">
+        <input data-k="segment" data-i="${i}" placeholder="Segmento" value="${e(md.segment || "")}">
+        <input data-k="url" data-i="${i}" placeholder="https://..." value="${e(md.url || "")}">
+        <input type="color" data-k="color" data-i="${i}" value="${e(md.color || "#6a3bff")}">
+        <button class="icon-btn danger" data-rm="${i}" aria-label="Remover">${ic("trash", 18)}</button></div>`).join("") : `<div class="empty">Nenhum modelo.</div>`;
+      NC.$$("#mList input").forEach((inp) => (inp.oninput = () => (models[inp.dataset.i][inp.dataset.k] = inp.value)));
+      NC.$$("#mList [data-rm]").forEach((b) => (b.onclick = () => { models.splice(+b.dataset.rm, 1); drawModels(); }));
+    };
+    drawModels();
+    NC.$("#mAdd").onclick = () => { models.push({ title: "", segment: "", url: "", color: "#6a3bff" }); drawModels(); };
+    NC.$("#mSave").onclick = async () => {
+      const clean = []; for (const md of models) { if (!md.title && !md.url) continue; const u = NC.normalizeUrl(md.url); if (!u || !md.title) return NC.toast("Cada modelo precisa de nome e link https válido.", "err"); clean.push({ title: md.title.trim(), segment: (md.segment || "").trim(), url: u, color: md.color || "#6a3bff" }); }
+      const { error } = await NC.sb.from("nc_settings").upsert({ key: "minisite_models", value: clean, updated_at: new Date().toISOString() });
+      if (error) return NC.err(error); models = clean; drawModels(); NC.toast("Modelos salvos!");
+    };
     NC.$("#fP").onsubmit = async (x) => { x.preventDefault(); const f = x.target; const val = { ...p, name: f.name.value.trim(), support_whatsapp: NC.digits(f.support_whatsapp.value), support_email: f.support_email.value.trim() };
       const { error } = await NC.sb.from("nc_settings").upsert({ key: "platform", value: val, updated_at: new Date().toISOString() }); if (error) return NC.err(error); NC.toast("Configurações salvas."); };
     NC.$("#fM").onsubmit = async (x) => { x.preventDefault(); const f = x.target;
