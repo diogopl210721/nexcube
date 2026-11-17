@@ -182,7 +182,7 @@
           <label>Status<select name="status"><option value="active">Ativo (acesso liberado)</option><option value="pending">Pendente</option><option value="suspended">Suspenso</option></select></label></div>
         <label>Endereço <small>(opcional)</small><input name="address" value="${e(c.address || "")}"></label>
         <label>Endereço da página pública *<div class="input-group"><span>nexcube3d.com.br/</span><input name="public_slug" required pattern="[a-z0-9]([a-z0-9\\-]{0,48}[a-z0-9])?" value="${e(c.public_slug || "")}" placeholder="nomedaempresa"></div>
-          <small>Só letras minúsculas, números e hífen. É o endereço que aparece para os visitantes.</small></label>
+          <small id="slugMsg">Só letras minúsculas, números e hífen. É o endereço que aparece para os visitantes.</small></label>
         <div class="grid2"><label>Cor principal<input type="color" name="primary_color" value="${e(c.primary_color)}"></label><label>Cor de fundo<input type="color" name="bg_color" value="${e(c.bg_color)}"></label></div>
         <label>Logo <small>(opcional, até 2 MB)</small><input type="file" name="logo" accept="image/png,image/jpeg,image/webp"></label>
         <label>Observações internas <small>(só a Nexcube vê)</small><textarea name="notes" placeholder="Anotações sobre o cliente">${e(c._notes || "")}</textarea></label>
@@ -191,28 +191,55 @@
       onOpen: (w) => {
         const f = NC.$("#fC", w); f.status.value = c.status;
         if (isNew) { NC.maskPhone(f.phone); NC.maskPhone(f.phone2); }
-        if (isNew) { let touched = false; f.public_slug.oninput = () => (touched = true); f.company_name.oninput = () => { if (!touched) f.public_slug.value = NC.slugify(f.company_name.value); }; }
+        let touched = !isNew, tmr;
+        const msg = NC.$("#slugMsg", w);
+        const check = async () => {
+          const sl = NC.slugify(f.public_slug.value); if (!sl) { msg.textContent = "Informe o endereço."; msg.style.color = "var(--bad)"; return false; }
+          if (sl !== f.public_slug.value) f.public_slug.value = sl;
+          const { data } = await NC.sb.rpc("nc_slug_free", { p_slug: sl, p_except: c.id || null });
+          if (data) { msg.innerHTML = "✓ Disponível: " + e(NC.publicUrl(sl)); msg.style.color = "var(--ok)"; return true; }
+          let alt = sl, i = 2; while (i < 30) { const t = `${sl.slice(0, 46)}-${i}`; const r = await NC.sb.rpc("nc_slug_free", { p_slug: t, p_except: c.id || null }); if (r.data) { alt = t; break; } i++; }
+          msg.innerHTML = `✗ Esse endereço já está em uso. <button type="button" class="link-btn" id="useAlt">Usar “${e(alt)}”</button>`; msg.style.color = "var(--bad)";
+          NC.$("#useAlt", w).onclick = () => { f.public_slug.value = alt; check(); };
+          return false;
+        };
+        f._checkSlug = check;
+        const later = () => { clearTimeout(tmr); tmr = setTimeout(check, 450); };
+        f.public_slug.addEventListener("input", () => { touched = true; later(); });
+        if (isNew) f.company_name.addEventListener("input", () => { if (!touched) { f.public_slug.value = NC.slugify(f.company_name.value); later(); } });
       },
       actions: [{ label: "Cancelar", cls: "ghost" }, {
         label: isNew ? "Cadastrar cliente" : "Salvar", cls: "primary", onClick: async (w) => {
           const f = NC.$("#fC", w); if (!f.reportValidity()) return false;
           let acc = null; if (isNew) { acc = NC.checkPhonePin(f); if (!acc) return false; }
+          if (!(await f._checkSlug())) { NC.toast("Escolha um endereço de página disponível.", "err"); return false; }
           const row = {};
           ["company_name", "contact_name", "document", "segment", "address", "status", "primary_color", "bg_color"].forEach((k) => (row[k] = f[k].value.trim() || null));
-          if (acc) row.phone = acc.phone;
           row.public_slug = NC.slugify(f.public_slug.value);
-          if (!row.public_slug) { NC.toast("Informe o endereço da página.", "err"); return false; }
+          if (acc) row.phone = acc.phone;
+          // 1) salva o cadastro (se já foi salvo numa tentativa anterior, só atualiza)
+          let saved;
           try {
-            let saved;
-            if (isNew) { const r = await NC.sb.from("nc_customers").insert(row).select().single(); if (r.error) throw r.error; saved = r.data; }
-            else { const r = await NC.sb.from("nc_customers").update(row).eq("id", c.id).select().single(); if (r.error) throw r.error; saved = r.data; }
-            if (f.logo.files[0]) { const p = await NC.uploadImage(saved.id, f.logo.files[0], "logo"); await NC.sb.from("nc_customers").update({ logo_path: p }).eq("id", saved.id); }
-            await NC.sb.from("nc_customer_notes").upsert({ customer_id: saved.id, notes: f.notes.value.trim() || null, updated_at: new Date().toISOString() });
-            if (isNew && f.mktag.checked) { const r = await NC.sb.from("nc_tags").insert({ customer_id: saved.id, label: "Tag principal", tag_type: "nfc_qr" }); if (r.error) NC.err(r.error); }
-            if (acc) { try { await fn({ action: "set_client_access", customer_id: saved.id, phone: acc.phone, pin: acc.pin }); } catch (err) { NC.toast("Cliente salvo, mas o login não foi criado: " + err.message, "err"); } }
-            NC.toast(isNew ? "Cliente cadastrado!" : "Cliente atualizado!");
-            location.hash = "cliente/" + saved.id; if (!isNew) route();
+            const targetId = c.id || w._createdId;
+            const r = targetId ? await NC.sb.from("nc_customers").update(row).eq("id", targetId).select().single()
+                               : await NC.sb.from("nc_customers").insert(row).select().single();
+            if (r.error) throw r.error; saved = r.data; if (isNew) w._createdId = saved.id;
           } catch (err) { NC.err(err); return false; }
+          const warn = [];
+          // 2) logo (opcional — se falhar, o cadastro continua)
+          if (f.logo.files[0]) {
+            try { const p = await NC.uploadImage(saved.id, f.logo.files[0], "logo"); const u = await NC.sb.from("nc_customers").update({ logo_path: p }).eq("id", saved.id); if (u.error) throw u.error; }
+            catch (err) { warn.push("a logo não foi enviada (" + (err.message || "erro") + ")"); }
+          }
+          // 3) observações
+          await NC.sb.from("nc_customer_notes").upsert({ customer_id: saved.id, notes: f.notes.value.trim() || null, updated_at: new Date().toISOString() });
+          // 4) tag
+          if (isNew && f.mktag && f.mktag.checked && !w._tagDone) { const r = await NC.sb.from("nc_tags").insert({ customer_id: saved.id, label: "Tag principal", tag_type: "nfc_qr" }); if (r.error) warn.push("a tag não foi criada"); else w._tagDone = true; }
+          // 5) login (telefone + PIN)
+          if (acc) { try { await fn({ action: "set_client_access", customer_id: saved.id, phone: acc.phone, pin: acc.pin }); } catch (err) { warn.push("o login não foi criado: " + err.message); } }
+          if (warn.length) NC.toast("Cliente salvo, mas " + warn.join("; ") + ". Ajuste na ficha do cliente.", "err");
+          else NC.toast(isNew ? "Cliente cadastrado com login!" : "Cliente atualizado!");
+          location.hash = "cliente/" + saved.id; if (!isNew) route();
         }
       }]
     });
@@ -236,10 +263,20 @@
       <div class="topbar"><div><a href="#clientes" class="small">← Clientes</a><h1>${e(c.company_name)} ${badge(ST, c.status)}</h1><p class="muted small">${e(NC.publicUrl(c.public_slug))}</p></div>
         <div class="row"><a class="btn" target="_blank" rel="noopener" href="${e(NC.publicUrl(c.public_slug))}">${ic("eye", 18)} Ver página</a>
           <button class="btn" id="edit">${ic("edit", 18)} Editar</button>
+          <button class="icon-btn danger" id="delC" title="Excluir cliente">${ic("trash", 18)}</button>
           ${c.status !== "active" ? `<button class="btn primary" data-st="active">${ic("check", 18)} ${c.status === "pending" ? "Liberar acesso" : "Reativar"}</button>` : `<button class="btn" data-st="suspended" style="color:var(--bad)">Suspender</button>`}</div></div>
       <div class="tabs">${[["resumo", "Resumo"], ["tags", "Tags (" + st.tags.length + ")"], ["pagina", "Perfil público"], ["minisite", "Mini site"], ["stats", "Estatísticas"], ["hist", "Histórico"]].map(([k, l]) => `<button data-tab="${k}">${l}</button>`).join("")}</div>
       <div id="tabv"></div>`;
     NC.$("#edit").onclick = () => customerForm(c);
+    NC.$("#delC").onclick = async () => {
+      if (!(await NC.confirm("Excluir cliente", `Excluir "${c.company_name}" definitivamente? A página, os links e as estatísticas serão apagados. As tags voltam para o estoque (sem cliente). Não pode ser desfeito.`, "Excluir"))) return;
+      if (c.owner_user_id) { try { await fn({ action: "remove_access", customer_id: c.id }); } catch (x) {} }
+      const u = await NC.sb.from("nc_tags").update({ customer_id: null, destination_type: "links", custom_url: null }).eq("customer_id", c.id);
+      if (u.error) return NC.err(u.error);
+      const d = await NC.sb.from("nc_customers").delete().eq("id", c.id);
+      if (d.error) return NC.err(d.error);
+      NC.toast("Cliente excluído."); location.hash = "clientes";
+    };
     NC.$$("[data-st]").forEach((b) => (b.onclick = async () => {
       const to = b.dataset.st;
       if (to === "suspended" && !(await NC.confirm("Suspender cliente", "As tags do cliente serão suspensas e a página pública ficará indisponível. Deseja continuar?", "Suspender"))) return;

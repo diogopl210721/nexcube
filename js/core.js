@@ -180,7 +180,7 @@
     if (file.size > 2 * 1024 * 1024) throw new Error("A imagem deve ter no máximo 2 MB.");
     const ext = file.type.split("/")[1].replace("jpeg", "jpg");
     const path = `${customerId}/${kind}-${Date.now()}.${ext}`;
-    const { error } = await NC.sb.storage.from(C.bucket).upload(path, file, { upsert: true, contentType: file.type, cacheControl: "3600" });
+    const { error } = await NC.sb.storage.from(C.bucket).upload(path, file, { upsert: false, contentType: file.type, cacheControl: "3600" });
     if (error) throw error;
     return path;
   };
