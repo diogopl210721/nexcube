@@ -363,11 +363,13 @@
         bar.innerHTML = `<span class="muted small grow">Último acesso: ${NC.fmtDateTime(t.last_access_at)} · criada em ${NC.fmtDate(t.created_at)}</span>
           <button class="btn sm" data-a="edit">${ic("edit", 16)} Apelido/tipo</button>
           <button class="btn sm" data-a="move">${ic("users", 16)} Alterar cliente</button>
-          <button class="btn sm" data-a="st">${t.status === "active" ? "Suspender" : "Ativar"}</button>`;
+          <button class="btn sm" data-a="st">${t.status === "active" ? "Suspender" : "Ativar"}</button>
+          <button class="icon-btn danger" data-a="del" title="Excluir tag">${ic("trash", 18)}</button>`;
         box.appendChild(bar);
         NC.$('[data-a="edit"]', bar).onclick = () => tagEdit(t);
         NC.$('[data-a="move"]', bar).onclick = () => tagMove(t);
         NC.$('[data-a="st"]', bar).onclick = () => tagStatus(t);
+        NC.$('[data-a="del"]', bar).onclick = () => { S.customers = S.customers.length ? S.customers : [c]; tagDelete(t); };
       });
     }
 
@@ -491,6 +493,15 @@
         if (error) { NC.err(error); return false; } NC.toast("Tag atualizada."); route(); } }]
     });
   }
+  async function tagDelete(t) {
+    const msg = t.customer_id
+      ? `A tag ${t.code} está vinculada a "${custName(t.customer_id)}". Quem ler essa tag ou o QR Code impresso verá "conteúdo indisponível". O histórico de acessos é mantido sem o vínculo. Não pode ser desfeito.`
+      : `Excluir a tag ${t.code} definitivamente? Se ela já foi gravada ou impressa, deixará de funcionar. Não pode ser desfeito.`;
+    if (!(await NC.confirm("Excluir tag", msg, "Excluir tag"))) return;
+    const { error } = await NC.sb.from("nc_tags").delete().eq("id", t.id);
+    if (error) return NC.err(error);
+    NC.toast("Tag excluída."); route();
+  }
   async function tagStatus(t) {
     const to = t.status === "active" ? "suspended" : "active";
     if (to === "suspended" && !(await NC.confirm("Suspender tag", `Ao suspender, quem ler a tag ${t.code} verá "conteúdo indisponível".`, "Suspender"))) return;
@@ -536,7 +547,8 @@
           <button class="icon-btn" title="Vincular/alterar cliente" data-mv="${t.id}">${ic("users", 18)}</button>
           <button class="icon-btn" title="Editar" data-ed="${t.id}">${ic("edit", 18)}</button>
           <button class="icon-btn" title="Histórico de acessos" data-h="${t.id}">${ic("chart", 18)}</button>
-          <button class="btn sm" data-st="${t.id}">${t.status === "active" ? "Suspender" : "Ativar"}</button></div></td></tr>`).join("")
+          <button class="btn sm" data-st="${t.id}">${t.status === "active" ? "Suspender" : "Ativar"}</button>
+          <button class="icon-btn danger" title="Excluir tag" data-del="${t.id}">${ic("trash", 18)}</button></div></td></tr>`).join("")
         : `<tr><td colspan="7"><div class="empty">${ic("tag", 34)}Nenhuma tag encontrada.</div></td></tr>`;
       const T = (id) => S.tags.find((x) => x.id === id);
       NC.$$("[data-qr]").forEach((b) => (b.onclick = () => tagQrModal(T(b.dataset.qr))));
@@ -546,6 +558,7 @@
       NC.$$("[data-ed]").forEach((b) => (b.onclick = () => tagEdit(T(b.dataset.ed))));
       NC.$$("[data-h]").forEach((b) => (b.onclick = () => tagHistory(T(b.dataset.h))));
       NC.$$("[data-st]").forEach((b) => (b.onclick = () => tagStatus(T(b.dataset.st))));
+      NC.$$("[data-del]").forEach((b) => (b.onclick = () => tagDelete(T(b.dataset.del))));
     };
     NC.$("#q").oninput = (x) => { q = x.target.value.toLowerCase(); draw(); };
     NC.$("#fs").onchange = (x) => { fs = x.target.value; draw(); };
