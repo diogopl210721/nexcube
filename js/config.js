@@ -6,6 +6,6 @@ window.NC_CONFIG = {
   site: "https://www.nexcube3d.com.br",
   bucket: "nc-public",
   footer: "Nexcube 3D — desenvolvido pela DDS Inovação",
-  dds: { url: "https://www.ddsinovacao.com.br", whatsapp: "5541991542931" },
+  dds: { url: "https://www.ddsinovacao.com.br", minisite: "https://www.ddsinovacao.com.br/dds-avaliacoes/", whatsapp: "5541991542931" },
   nexcubeWhatsapp: "5541996239421"
 };

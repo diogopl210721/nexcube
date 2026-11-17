@@ -142,9 +142,9 @@
   }
 
   function ddsAd() {
-    return `<div class="dds-ad"><div class="dds-logo">DDS</div><div><small>DDS Inovação</small><b>Seu negócio merece um site profissional</b>
-      <p>Veja como ficam os mini sites e sistemas que a DDS cria.</p></div>
-      <a class="btn sm" href="${e(C.dds.url)}" target="_blank" rel="noopener">Ver como funciona →</a></div>`;
+    return `<div class="dds-ad"><div class="dds-logo">DDS</div><div><small>DDS Inovação</small><b>Mini Site DDS para o seu negócio</b>
+      <p>Veja como funciona o mini site profissional da DDS Inovação.</p></div>
+      <a class="btn sm" href="${e(C.dds.minisite)}" target="_blank" rel="noopener">Ver como funciona →</a></div>`;
   }
 
   /* ---------------- LINKS ---------------- */
@@ -206,7 +206,9 @@
           <div><b>🛠️ Feito por especialistas</b><span>Desenvolvido sob medida pela DDS Inovação.</span></div>
         </div>
         <p class="alert warn small">${ic("sparkle", 18)}<span>Serviço adicional e opcional, <b>não incluso</b> no plano da tag. Após o pedido, a DDS entra em contato com briefing, orçamento e prazo.</span></p>
-        <h3 style="margin-top:1.2rem">Solicitar meu mini site</h3>
+        <div class="row" style="margin:1rem 0"><a class="btn primary" href="${e(C.dds.minisite)}" target="_blank" rel="noopener">${ic("rocket", 18)} Conhecer o Mini Site DDS</a>
+          <a class="btn" target="_blank" rel="noopener" href="${NC.waLink(C.dds.whatsapp, "Olá DDS! Sou cliente Nexcube 3D (" + c.company_name + ") e quero um mini site.")}">${ic("whatsapp", 18)} Falar com a DDS</a></div>
+        <h3 style="margin-top:1.2rem">Ou deixe sua solicitação aqui</h3>
         <form class="stack" id="fReq">
           <div class="grid2"><label>Segmento do negócio<input name="business_type" required placeholder="Ex.: confeitaria, salão, clínica"></label>
           <label>Objetivo principal<select name="goals"><option>Receber mais contatos no WhatsApp</option><option>Mostrar meus produtos/serviços</option><option>Passar mais credibilidade</option><option>Vender online</option><option>Outro</option></select></label></div>
