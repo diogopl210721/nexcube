@@ -17,7 +17,7 @@
 
   async function boot() {
     const s = await NC.getProfile();
-    if (!s || NC.authLinkType === "invite" || NC.authLinkType === "recovery") {
+    if (!s) {
       return NC.renderLogin(root, { title: "Entrar no meu painel", subtitle: "Painel do cliente", onDone: boot });
     }
     S.me = s;
@@ -62,14 +62,16 @@
         <a class="nav-a" href="${e(NC.publicUrl(c.public_slug))}" target="_blank" rel="noopener">${ic("eye")} Ver minha página</a>
         <div class="spacer"></div>
         <a class="nav-a" target="_blank" rel="noopener" href="${NC.waLink(C.nexcubeWhatsapp, "Olá! Preciso de ajuda com meu painel Nexcube 3D.")}">${ic("whatsapp")} Ajuda</a>
+        <button class="nav-a" id="chPin">${ic("lock")} Trocar meu PIN</button>
         <button class="nav-a" id="logout">${ic("logout")} Sair</button>
-        <div class="who">${e(S.me.user.email)}</div>
+        <div class="who">${e(NC.fmtPhone(NC.userPhone(S.me.user)))}</div>
       </aside>
       <main class="main" id="view"></main>
     </div>
     <nav class="bnav">${BOTTOM.map((id) => { const v = VIEWS.find((x) => x.id === id); return `<button data-go="${id}">${ic(v.icon, 22)}<span>${v.short || v.label}</span></button>`; }).join("")}</nav>`;
     NC.$$("[data-go]").forEach((b) => (b.onclick = () => { go(b.dataset.go); NC.$("#side").classList.remove("open"); }));
     NC.$("#logout").onclick = async () => { await NC.sb.auth.signOut(); location.hash = ""; boot(); };
+    NC.$("#chPin").onclick = () => NC.changePin(NC.userPhone(S.me.user));
     NC.$("#mOpen").onclick = (ev) => { ev.stopPropagation(); NC.$("#side").classList.toggle("open"); };
     document.addEventListener("click", (ev) => { const sd = NC.$("#side"); if (sd && sd.classList.contains("open") && !sd.contains(ev.target)) sd.classList.remove("open"); });
   }

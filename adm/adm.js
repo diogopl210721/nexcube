@@ -19,7 +19,7 @@
     customer_created: "Novo cliente cadastrado", customer_status: "Status do cliente alterado", minisite_updated: "Mini site atualizado",
     tag_created: "Nova tag criada", tag_reassigned: "Tag vinculada/alterada de cliente", tag_status: "Tag ativada/suspensa", tag_destination: "Destino da tag alterado",
     tag_code_changed: "Código da tag alterado", minisite_requested: "Solicitação de mini site", minisite_request_status: "Status da solicitação alterado",
-    client_invited: "Acesso do cliente criado", client_access_link: "Novo link de acesso gerado", client_access_removed: "Acesso do cliente removido", admin_invited: "Administrador convidado"
+    client_invited: "Acesso do cliente criado", client_access_link: "Novo link de acesso gerado", client_access_removed: "Acesso do cliente removido", admin_invited: "Administrador adicionado", client_pin_reset: "Telefone/PIN do cliente alterado", admin_bootstrap: "Administrador principal criado"
   };
   const ACT_IC = { customer_created: "users", tag_created: "tag", tag_reassigned: "tag", tag_status: "tag", tag_destination: "nfc", minisite_requested: "rocket", minisite_request_status: "rocket", minisite_updated: "rocket" };
 
@@ -31,7 +31,11 @@
 
   async function boot() {
     const s = await NC.getProfile();
-    if (!s || NC.authLinkType === "invite" || NC.authLinkType === "recovery") return NC.renderLogin(root, { title: "Gerenciador Nexcube 3D", subtitle: "Acesso administrativo", onDone: boot });
+    if (!s) {
+      let has = true; try { has = (await fn({ action: "has_admin" })).has_admin; } catch (x) {}
+      if (!has) return firstAdmin();
+      return NC.renderLogin(root, { title: "Gerenciador Nexcube 3D", subtitle: "Acesso administrativo", onDone: boot });
+    }
     if (!s.profile || s.profile.role !== "superadmin") {
       if (s.profile && s.profile.role === "client") { location.href = "/painel/"; return; }
       root.innerHTML = `<div class="auth"><div class="auth-card" style="text-align:center"><div style="font-size:2.2rem">🔒</div><h1>Sem permissão</h1><p class="muted">Esta área é exclusiva da administração Nexcube 3D.</p><button class="btn block" style="margin-top:1rem" id="out">Sair</button></div></div>`;
@@ -39,6 +43,29 @@
       return;
     }
     S.me = s; shell(); addEventListener("hashchange", route); route();
+  }
+
+  /* Primeiro acesso: cria o administrador principal (só funciona enquanto não existe nenhum) */
+  function firstAdmin() {
+    root.innerHTML = `<div class="auth"><div class="auth-card">
+      <div class="auth-brand"><img src="/assets/logo-cube.png" alt=""><div><b>NEX<span>CUBE</span> 3D</b><small>Primeiro acesso</small></div></div>
+      <h1>Criar administrador</h1><p class="muted small">Esta tela aparece só uma vez, antes de existir um administrador.</p>
+      <form id="fF" class="stack" style="margin-top:1rem">
+        <label>Seu nome<input name="name" required></label>
+        <label>Telefone (WhatsApp)<input name="phone" type="tel" inputmode="tel" required placeholder="(41) 99999-9999"></label>
+        <label>Repita o telefone<input name="phone2" type="tel" inputmode="tel" required></label>
+        ${NC.pinInput("pin", "Crie um PIN de 4 números")}${NC.pinInput("pin2", "Repita o PIN")}
+        <button class="btn primary block">Criar e entrar</button></form></div></div>`;
+    const f = NC.$("#fF"); NC.maskPhone(f.phone); NC.maskPhone(f.phone2);
+    f.onsubmit = async (ev) => {
+      ev.preventDefault(); const ok = NC.checkPhonePin(f); if (!ok) return;
+      const btn = NC.$("button", f); btn.disabled = true;
+      try {
+        await fn({ action: "bootstrap_admin", name: f.name.value.trim(), phone: ok.phone, pin: ok.pin });
+        const { error } = await NC.sb.auth.signInWithPassword(NC.authFromPhone(ok.phone, ok.pin)); if (error) throw error;
+        NC.toast("Administrador criado!"); boot();
+      } catch (err) { NC.err(err); btn.disabled = false; }
+    };
   }
 
   function shell() {
@@ -50,12 +77,14 @@
         ${NAV.map((n) => `<a class="nav-a" href="#${n.id}" data-nav="${n.id}">${ic(n.icon)} ${n.label}</a>`).join("")}
         <div class="spacer"></div>
         <a class="nav-a" href="/" target="_blank">${ic("globe")} Ver site</a>
+        <button class="nav-a" id="chPin">${ic("lock")} Trocar meu PIN</button>
         <button class="nav-a" id="logout">${ic("logout")} Sair</button>
-        <div class="who">${e(S.me.user.email)}</div>
+        <div class="who">${e(S.me.profile.full_name || "")} · ${e(NC.fmtPhone(NC.userPhone(S.me.user)))}</div>
       </aside>
       <main class="main" id="view"></main>
     </div>`;
     NC.$("#logout").onclick = async () => { await NC.sb.auth.signOut(); location.hash = ""; boot(); };
+    NC.$("#chPin").onclick = () => NC.changePin(NC.userPhone(S.me.user));
     NC.$("#mOpen").onclick = (ev) => { ev.stopPropagation(); NC.$("#side").classList.toggle("open"); };
     document.addEventListener("click", (ev) => { const sd = NC.$("#side"); if (sd && sd.classList.contains("open") && !sd.contains(ev.target)) sd.classList.remove("open"); });
   }
@@ -121,9 +150,9 @@
         <select id="fs"><option value="">Todos os status</option><option value="active">Ativos</option><option value="pending">Pendentes</option><option value="suspended">Suspensos</option></select></div>
       <div class="tbl-wrap"><table><thead><tr><th>Empresa</th><th>Responsável</th><th>Contato</th><th>Tags</th><th>Mini site</th><th>Status</th><th>Cadastro</th></tr></thead><tbody id="tb"></tbody></table></div>`;
     const draw = () => {
-      const L = S.customers.filter((c) => (!fs || c.status === fs) && (!q || [c.company_name, c.contact_name, c.email, c.phone, c.public_slug].join(" ").toLowerCase().includes(q)));
+      const L = S.customers.filter((c) => (!fs || c.status === fs) && (!q || [c.company_name, c.contact_name, c.phone, c.public_slug].join(" ").toLowerCase().includes(q)));
       NC.$("#tb").innerHTML = L.length ? L.map((c) => `<tr class="click" data-id="${c.id}"><td><b>${e(c.company_name)}</b><div class="muted tiny">/${e(c.public_slug)}</div></td><td>${e(c.contact_name || "—")}</td>
-        <td class="small">${e(c.email || "—")}<div class="muted">${e(c.phone || "")}</div></td><td>${S.tags.filter((t) => t.customer_id === c.id).length}</td>
+        <td class="small">${e(NC.fmtPhone(c.phone || "") || "—")}<div class="muted">${c.owner_user_id ? "com login" : "sem login"}</div></td><td>${S.tags.filter((t) => t.customer_id === c.id).length}</td>
         <td>${badge(MS, c.minisite_status)}</td><td>${badge(ST, c.status)}</td><td class="small">${NC.fmtDate(c.created_at)}</td></tr>`).join("")
         : `<tr><td colspan="7"><div class="empty">${ic("users", 34)}Nenhum cliente encontrado.</div></td></tr>`;
       NC.$$("#tb tr[data-id]").forEach((tr) => (tr.onclick = () => (location.hash = "cliente/" + tr.dataset.id)));
@@ -142,8 +171,12 @@
       body: `<form class="stack" id="fC">
         <div class="grid2"><label>Empresa ou profissional *<input name="company_name" required maxlength="120" value="${e(c.company_name || "")}"></label>
           <label>Responsável<input name="contact_name" value="${e(c.contact_name || "")}"></label></div>
-        <div class="grid2"><label>E-mail <small>(login do cliente)</small><input name="email" type="email" value="${e(c.email || "")}"></label>
-          <label>Telefone / WhatsApp<input name="phone" value="${e(c.phone || "")}" placeholder="(41) 99999-9999"></label></div>
+        ${isNew ? `<div class="card" style="box-shadow:none;background:var(--soft)"><h3 style="margin-bottom:.4rem">${ic("lock")} Login do cliente no painel</h3>
+          <p class="muted small" style="margin-bottom:.8rem">O cliente entra em <b>/painel</b> com o telefone e o PIN de 4 números. Digite duas vezes para não errar.</p>
+          <div class="grid2"><label>Telefone (WhatsApp) *<input name="phone" type="tel" inputmode="tel" required placeholder="(41) 99999-9999"></label>
+            <label>Repita o telefone *<input name="phone2" type="tel" inputmode="tel" required></label></div>
+          <div class="grid2" style="margin-top:.8rem">${NC.pinInput("pin", "PIN de 4 números *")}${NC.pinInput("pin2", "Repita o PIN *")}</div></div>`
+        : `<p class="muted small">Login do cliente: <b>${e(NC.fmtPhone(c.phone || ""))}</b> · para trocar telefone ou PIN use “Acesso do cliente” no Resumo.</p>`}
         <div class="grid3"><label>CNPJ <small>(opcional)</small><input name="document" value="${e(c.document || "")}"></label>
           <label>Segmento<input name="segment" value="${e(c.segment || "")}" placeholder="Ex.: restaurante"></label>
           <label>Status<select name="status"><option value="active">Ativo (acesso liberado)</option><option value="pending">Pendente</option><option value="suspended">Suspenso</option></select></label></div>
@@ -157,13 +190,16 @@
       </form>`,
       onOpen: (w) => {
         const f = NC.$("#fC", w); f.status.value = c.status;
+        if (isNew) { NC.maskPhone(f.phone); NC.maskPhone(f.phone2); }
         if (isNew) { let touched = false; f.public_slug.oninput = () => (touched = true); f.company_name.oninput = () => { if (!touched) f.public_slug.value = NC.slugify(f.company_name.value); }; }
       },
       actions: [{ label: "Cancelar", cls: "ghost" }, {
         label: isNew ? "Cadastrar cliente" : "Salvar", cls: "primary", onClick: async (w) => {
           const f = NC.$("#fC", w); if (!f.reportValidity()) return false;
+          let acc = null; if (isNew) { acc = NC.checkPhonePin(f); if (!acc) return false; }
           const row = {};
-          ["company_name", "contact_name", "email", "phone", "document", "segment", "address", "status", "primary_color", "bg_color"].forEach((k) => (row[k] = f[k].value.trim() || null));
+          ["company_name", "contact_name", "document", "segment", "address", "status", "primary_color", "bg_color"].forEach((k) => (row[k] = f[k].value.trim() || null));
+          if (acc) row.phone = acc.phone;
           row.public_slug = NC.slugify(f.public_slug.value);
           if (!row.public_slug) { NC.toast("Informe o endereço da página.", "err"); return false; }
           try {
@@ -173,6 +209,7 @@
             if (f.logo.files[0]) { const p = await NC.uploadImage(saved.id, f.logo.files[0], "logo"); await NC.sb.from("nc_customers").update({ logo_path: p }).eq("id", saved.id); }
             await NC.sb.from("nc_customer_notes").upsert({ customer_id: saved.id, notes: f.notes.value.trim() || null, updated_at: new Date().toISOString() });
             if (isNew && f.mktag.checked) { const r = await NC.sb.from("nc_tags").insert({ customer_id: saved.id, label: "Tag principal", tag_type: "nfc_qr" }); if (r.error) NC.err(r.error); }
+            if (acc) { try { await fn({ action: "set_client_access", customer_id: saved.id, phone: acc.phone, pin: acc.pin }); } catch (err) { NC.toast("Cliente salvo, mas o login não foi criado: " + err.message, "err"); } }
             NC.toast(isNew ? "Cliente cadastrado!" : "Cliente atualizado!");
             location.hash = "cliente/" + saved.id; if (!isNew) route();
           } catch (err) { NC.err(err); return false; }
@@ -223,8 +260,8 @@
       T.innerHTML = `<div class="split">
         <div class="stack">
           <div class="card"><h3>Dados do cliente</h3><div class="grid2 small">
-            <div><span class="muted">Responsável</span><br><b>${e(c.contact_name || "—")}</b></div><div><span class="muted">E-mail</span><br><b>${e(c.email || "—")}</b></div>
-            <div><span class="muted">Telefone</span><br><b>${e(c.phone || "—")}</b></div><div><span class="muted">CNPJ</span><br><b>${e(c.document || "—")}</b></div>
+            <div><span class="muted">Responsável</span><br><b>${e(c.contact_name || "—")}</b></div><div><span class="muted">Login (telefone)</span><br><b>${e(NC.fmtPhone(c.phone || "") || "—")}</b></div>
+            <div><span class="muted">Painel</span><br><b>${c.owner_user_id ? "Com acesso" : "Sem acesso"}</b></div><div><span class="muted">CNPJ</span><br><b>${e(c.document || "—")}</b></div>
             <div><span class="muted">Segmento</span><br><b>${e(c.segment || "—")}</b></div><div><span class="muted">Cadastro</span><br><b>${NC.fmtDate(c.created_at)}</b></div></div>
             ${c.address ? `<p class="small" style="margin-top:.8rem"><span class="muted">Endereço:</span> ${e(c.address)}</p>` : ""}</div>
           <div class="card stack"><h3 style="margin:0">Página pública</h3>
@@ -233,22 +270,29 @@
           <div class="card"><h3>Observações internas</h3><textarea id="notes" placeholder="Só a Nexcube vê">${e(c._notes || "")}</textarea><button class="btn sm" style="margin-top:.6rem" id="svN">Salvar observações</button></div>
         </div>
         <div class="card stack"><h3 style="margin:0">${ic("lock")} Acesso do cliente ao painel</h3>
-          ${c.owner_user_id ? `<p class="alert ok small">${ic("check", 18)}<span>Acesso criado para <b>${e(c.email || "")}</b>. ${c.status === "active" ? "O cliente já pode entrar em <b>/painel</b>." : "O painel só abre quando o cliente estiver <b>ativo</b>."}</span></p>
-            <button class="btn" id="newLink">${ic("custom", 18)} Gerar novo link de acesso</button>
-            <button class="btn ghost" id="rmAcc" style="color:var(--bad)">Remover acesso</button>`
-          : `<p class="muted small">Crie o acesso e envie o link ao cliente pelo WhatsApp. Ele cria a própria senha. Nenhuma senha é exibida para a Nexcube.</p>
-            <label>E-mail de login do cliente<input id="accEmail" type="email" value="${e(c.email || "")}" placeholder="cliente@empresa.com.br"></label>
-            <button class="btn primary" id="mkAcc">${ic("plus", 18)} Criar acesso e gerar link</button>`}
+          ${c.owner_user_id ? `<p class="alert ok small">${ic("check", 18)}<span>Login: <b>${e(NC.fmtPhone(c.phone || ""))}</b> + PIN. ${c.status === "active" ? "O cliente já pode entrar em <b>/painel</b>." : "O painel só abre quando o cliente estiver <b>ativo</b>."}</span></p>`
+            : `<p class="alert warn small">${ic("lock", 18)}<span>Este cliente ainda não tem login.</span></p>`}
+          <form class="stack" id="fAcc">
+            <div class="grid2"><label>Telefone (WhatsApp)<input name="phone" type="tel" inputmode="tel" required value="${e(NC.fmtPhone(c.phone || ""))}"></label>
+              <label>Repita o telefone<input name="phone2" type="tel" inputmode="tel" required></label></div>
+            <div class="grid2">${NC.pinInput("pin", c.owner_user_id ? "Novo PIN" : "PIN de 4 números")}${NC.pinInput("pin2", "Repita o PIN")}</div>
+            <button class="btn primary">${ic("check", 18)} ${c.owner_user_id ? "Salvar novo telefone/PIN" : "Criar login do cliente"}</button>
+          </form>
+          ${c.owner_user_id ? `<button class="btn ghost" id="rmAcc" style="color:var(--bad)">Remover acesso</button>` : ""}
+          ${c.phone ? `<a class="btn" target="_blank" rel="noopener" id="waAcc" href="#">${ic("whatsapp", 18)} Enviar instruções de acesso no WhatsApp</a>` : ""}
           <p class="muted tiny">Endereço do painel do cliente: ${e(C.site)}/painel</p>
         </div></div>`;
       NC.$("#cpP").onclick = () => NC.copy(NC.publicUrl(c.public_slug));
       NC.$("#svN").onclick = async () => { const { error } = await NC.sb.from("nc_customer_notes").upsert({ customer_id: c.id, notes: NC.$("#notes").value.trim() || null, updated_at: new Date().toISOString() }); if (error) return NC.err(error); NC.toast("Observações salvas."); };
-      const mk = NC.$("#mkAcc"); if (mk) mk.onclick = async () => {
-        mk.disabled = true;
-        try { const r = await fn({ action: "invite_client", customer_id: c.id, email: NC.$("#accEmail").value.trim() }); showLink(r.link, c); route(); }
-        catch (err) { NC.err(err); } finally { mk.disabled = false; }
+      const fa = NC.$("#fAcc"); NC.maskPhone(fa.phone); NC.maskPhone(fa.phone2);
+      fa.onsubmit = async (ev) => {
+        ev.preventDefault(); const ok = NC.checkPhonePin(fa); if (!ok) return;
+        const btn = NC.$("button", fa); btn.disabled = true;
+        try { await fn({ action: "set_client_access", customer_id: c.id, phone: ok.phone, pin: ok.pin }); NC.toast(c.owner_user_id ? "Telefone/PIN atualizados!" : "Login do cliente criado!"); route(); }
+        catch (err) { NC.err(err); btn.disabled = false; }
       };
-      const nl = NC.$("#newLink"); if (nl) nl.onclick = async () => { nl.disabled = true; try { const r = await fn({ action: "access_link", customer_id: c.id }); showLink(r.link, c); } catch (err) { NC.err(err); } finally { nl.disabled = false; } };
+      const wa = NC.$("#waAcc"); if (wa) { const first = (c.contact_name || c.company_name || "").split(" ")[0];
+        wa.href = NC.waLink(c.phone, `Olá ${first}! 👋\nSeu painel da Nexcube 3D está pronto.\n\nAcesse: ${C.site}/painel\nEntre com este telefone e o PIN de 4 números que combinamos.\n\nLá você edita sua página, seus links e o destino da sua tag.`); }
       const ra = NC.$("#rmAcc"); if (ra) ra.onclick = async () => { if (!(await NC.confirm("Remover acesso", "O cliente não conseguirá mais entrar no painel até um novo acesso ser criado.", "Remover"))) return; try { await fn({ action: "remove_access", customer_id: c.id }); NC.toast("Acesso removido."); route(); } catch (err) { NC.err(err); } };
     }
 
@@ -501,17 +545,19 @@
           <label>Título<input name="title" value="${e(m.title || "")}"></label><label>Texto<textarea name="body">${e(m.body || "")}</textarea></label>
           <div><button class="btn primary">Salvar</button></div></form></div>
         <div class="card stack"><h3 style="margin:0">Administradores</h3>
-          <div class="feed">${(ad.data || []).map((a) => `<div><span class="dot">${ic("user", 16)}</span><span>${e(a.full_name || a.email)}<small>${e(a.email || "")}</small></span></div>`).join("")}</div>
-          <form class="stack" id="fA"><label>Nome<input name="full_name"></label><label>E-mail<input name="email" type="email" required></label><button class="btn">${ic("plus", 18)} Convidar administrador</button></form></div></div>`;
+          <div class="feed">${(ad.data || []).map((a) => `<div><span class="dot">${ic("user", 16)}</span><span>${e(a.full_name || "Administrador")}<small>${e(NC.fmtPhone(a.email || ""))}</small></span></div>`).join("")}</div>
+          <form class="stack" id="fA"><label>Nome<input name="full_name" required></label>
+            <div class="grid2"><label>Telefone<input name="phone" type="tel" required></label><label>Repita o telefone<input name="phone2" type="tel" required></label></div>
+            <div class="grid2">${NC.pinInput("pin", "PIN (4 números)")}${NC.pinInput("pin2", "Repita o PIN")}</div>
+            <button class="btn">${ic("plus", 18)} Adicionar administrador</button></form></div></div>`;
     NC.$("#fP").onsubmit = async (x) => { x.preventDefault(); const f = x.target; const val = { ...p, name: f.name.value.trim(), support_whatsapp: NC.digits(f.support_whatsapp.value), support_email: f.support_email.value.trim() };
       const { error } = await NC.sb.from("nc_settings").upsert({ key: "platform", value: val, updated_at: new Date().toISOString() }); if (error) return NC.err(error); NC.toast("Configurações salvas."); };
     NC.$("#fM").onsubmit = async (x) => { x.preventDefault(); const f = x.target;
       const { error } = await NC.sb.from("nc_settings").upsert({ key: "minisite_text", value: { title: f.title.value.trim(), body: f.body.value.trim() }, updated_at: new Date().toISOString() }); if (error) return NC.err(error); NC.toast("Texto salvo."); };
-    NC.$("#fA").onsubmit = async (x) => { x.preventDefault(); const f = x.target; const btn = NC.$("button", f); btn.disabled = true;
-      try { const r = await fn({ action: "invite_admin", email: f.email.value.trim(), full_name: f.full_name.value.trim() });
-        NC.modal({ title: "Convite de administrador", body: `<p class="muted small">Envie este link (uso único, expira em 24h):</p><div class="url-line" style="margin-top:.6rem"><span style="font-size:.75rem">${e(r.link)}</span></div>`, actions: [{ label: "Copiar link", cls: "primary", onClick: () => NC.copy(r.link) }] });
-        config(v);
-      } catch (err) { NC.err(err); } finally { btn.disabled = false; } };
+    const fA = NC.$("#fA"); NC.maskPhone(fA.phone); NC.maskPhone(fA.phone2);
+    fA.onsubmit = async (x) => { x.preventDefault(); const f = x.target; const ok = NC.checkPhonePin(f); if (!ok) return; const btn = NC.$("button", f); btn.disabled = true;
+      try { await fn({ action: "create_admin", name: f.full_name.value.trim(), phone: ok.phone, pin: ok.pin }); NC.toast("Administrador adicionado!"); config(v); }
+      catch (err) { NC.err(err); btn.disabled = false; } };
   }
 
   boot();

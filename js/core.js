@@ -3,13 +3,8 @@
   const C = window.NC_CONFIG;
   const NC = (window.NC = window.NC || {});
 
-  // captura o tipo de link (convite/recuperação) ANTES do supabase limpar a URL
-  const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
-  NC.authLinkType = hash.get("type"); // 'invite' | 'recovery' | null
-  NC.authLinkError = hash.get("error_description");
-
   NC.sb = window.supabase.createClient(C.supabaseUrl, C.supabaseKey, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: "nc-auth" }
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: "nc-auth" }
   });
 
   /* ---------- utilidades ---------- */
@@ -198,53 +193,70 @@
     return { session, user: session.user, profile: data };
   };
 
-  /* Tela de login (com "definir senha" para links de convite/recuperação) */
-  NC.renderLogin = (root, { title, subtitle, onDone }) => {
-    const setPass = NC.authLinkType === "invite" || NC.authLinkType === "recovery";
+  /* ---------- login por TELEFONE + PIN (4 números) ----------
+     Mesma regra da Edge Function nc-admin: e-mail interno + senha que combina PIN e telefone. */
+  NC.phoneDigits = (p) => { let d = NC.digits(p); if (d.length >= 10 && d.length <= 11) d = "55" + d; return d; };
+  NC.validPhone = (d) => /^55\d{10,11}$/.test(d);
+  NC.authFromPhone = (phone, pin) => { const d = NC.phoneDigits(phone); return { email: `${d}@tel.nexcube3d.com.br`, password: `NC#${pin}#${d}` }; };
+  NC.fmtPhone = (d) => { d = NC.digits(d).replace(/^55/, ""); return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d; };
+  NC.maskPhone = (input) => input.addEventListener("input", () => { const pos = input.value.length; input.value = NC.fmtPhone(input.value.slice(0, 16)); });
+  NC.pinInput = (name, label) => `<label>${label}<input name="${name}" type="password" inputmode="numeric" pattern="\\d{4}" maxlength="4" minlength="4" required autocomplete="off" placeholder="••••" style="letter-spacing:.5em;font-size:1.2rem;max-width:160px"></label>`;
+  /* valida pares "repita" (telefone e PIN) de um formulário */
+  NC.checkPhonePin = (f, { phone = "phone", phone2 = "phone2", pin = "pin", pin2 = "pin2", needPin = true } = {}) => {
+    const d = NC.phoneDigits(f[phone].value);
+    if (!NC.validPhone(d)) { NC.toast("Telefone inválido. Use DDD + número.", "err"); return null; }
+    if (f[phone2] && NC.phoneDigits(f[phone2].value) !== d) { NC.toast("Os telefones não conferem. Digite novamente.", "err"); return null; }
+    if (!needPin && !f[pin].value) return { phone: d, pin: null };
+    if (!/^\d{4}$/.test(f[pin].value)) { NC.toast("O PIN deve ter exatamente 4 números.", "err"); return null; }
+    if (f[pin2] && f[pin2].value !== f[pin].value) { NC.toast("Os PINs não conferem. Digite novamente.", "err"); return null; }
+    return { phone: d, pin: f[pin].value };
+  };
+
+  NC.renderLogin = (root, { title, subtitle, onDone, extra }) => {
     root.innerHTML = `<div class="auth">
       <div class="auth-card">
         <div class="auth-brand"><img src="/assets/logo-cube.png" alt=""><div><b>NEX<span>CUBE</span> 3D</b><small>${NC.esc(subtitle || "")}</small></div></div>
-        <h1>${setPass ? "Crie sua senha" : NC.esc(title)}</h1>
-        ${NC.authLinkError ? `<p class="alert err">O link de acesso expirou ou já foi usado. Peça um novo link à Nexcube 3D.</p>` : ""}
-        ${setPass ? `<p class="muted">Bem-vindo(a)! Defina uma senha para entrar nas próximas vezes.</p>
-          <form id="fPass" class="stack">
-            <label>Nova senha<input type="password" name="p1" minlength="8" required autocomplete="new-password" placeholder="Mínimo 8 caracteres"></label>
-            <label>Repita a senha<input type="password" name="p2" minlength="8" required autocomplete="new-password"></label>
-            <button class="btn primary block">Salvar senha e entrar</button></form>`
-        : `<form id="fLogin" class="stack">
-            <label>E-mail<input type="email" name="email" required autocomplete="email" placeholder="voce@empresa.com.br"></label>
-            <label>Senha<input type="password" name="pass" required autocomplete="current-password"></label>
-            <button class="btn primary block">Entrar</button>
-            <button type="button" class="link-btn" id="forgot">Esqueci minha senha</button></form>`}
+        <h1>${NC.esc(title)}</h1>
+        <form id="fLogin" class="stack">
+          <label>Telefone (WhatsApp)<input name="phone" type="tel" inputmode="tel" required autocomplete="tel" placeholder="(41) 99999-9999"></label>
+          ${NC.pinInput("pin", "Senha (PIN de 4 números)")}
+          <button class="btn primary block">Entrar</button>
+          <button type="button" class="link-btn" id="forgot">Esqueci meu PIN</button></form>
+        ${extra || ""}
       </div></div>`;
-    const fp = NC.$("#fPass", root);
-    if (fp) fp.onsubmit = async (e) => {
-      e.preventDefault(); const p1 = fp.p1.value, p2 = fp.p2.value;
-      if (p1 !== p2) return NC.toast("As senhas não conferem.", "err");
-      const btn = NC.$("button", fp); btn.disabled = true;
-      const { error } = await NC.sb.auth.updateUser({ password: p1 });
-      btn.disabled = false;
-      if (error) return NC.err(error);
-      NC.authLinkType = null; history.replaceState(null, "", location.pathname);
-      NC.toast("Senha criada com sucesso!"); onDone();
-    };
     const fl = NC.$("#fLogin", root);
-    if (fl) {
-      fl.onsubmit = async (e) => {
-        e.preventDefault(); const btn = NC.$("button", fl); btn.disabled = true;
-        const { error } = await NC.sb.auth.signInWithPassword({ email: fl.email.value.trim(), password: fl.pass.value });
-        btn.disabled = false;
-        if (error) return NC.toast("E-mail ou senha incorretos.", "err");
-        onDone();
-      };
-      NC.$("#forgot", root).onclick = () => NC.modal({
-        title: "Esqueci minha senha",
-        body: `<p class="muted">Peça um novo link de acesso à Nexcube 3D pelo WhatsApp. O link chega na hora e você cria uma nova senha.</p>
-               <a class="btn primary block" target="_blank" rel="noopener" href="${NC.waLink(C.nexcubeWhatsapp, "Olá! Preciso de um novo link de acesso ao meu painel Nexcube 3D.")}">${NC.icon("whatsapp")} Pedir novo link no WhatsApp</a>`,
-        actions: [{ label: "Fechar", cls: "ghost" }]
-      });
-    }
+    NC.maskPhone(fl.phone);
+    fl.onsubmit = async (e) => {
+      e.preventDefault();
+      const ok = NC.checkPhonePin(fl, { phone2: "_", pin2: "_" }); if (!ok) return;
+      const btn = NC.$("button", fl); btn.disabled = true;
+      const { error } = await NC.sb.auth.signInWithPassword(NC.authFromPhone(ok.phone, ok.pin));
+      btn.disabled = false;
+      if (error) return NC.toast(/rate|many/i.test(error.message) ? "Muitas tentativas. Aguarde alguns minutos." : "Telefone ou PIN incorretos.", "err");
+      onDone();
+    };
+    NC.$("#forgot", root).onclick = () => NC.modal({
+      title: "Esqueci meu PIN",
+      body: `<p class="muted">A Nexcube 3D cadastra um novo PIN para você na hora. É só pedir pelo WhatsApp.</p>
+             <a class="btn primary block" style="margin-top:1rem" target="_blank" rel="noopener" href="${NC.waLink(C.nexcubeWhatsapp, "Olá! Esqueci o PIN do meu painel Nexcube 3D.")}">${NC.icon("whatsapp")} Pedir novo PIN no WhatsApp</a>`,
+      actions: [{ label: "Fechar", cls: "ghost" }]
+    });
   };
+
+  /* Trocar o próprio PIN (usuário logado) */
+  NC.changePin = (phone) => NC.modal({
+    title: "Trocar meu PIN",
+    body: `<form class="stack" id="fPin">${NC.pinInput("pin", "Novo PIN (4 números)")}${NC.pinInput("pin2", "Repita o novo PIN")}</form>`,
+    actions: [{ label: "Cancelar", cls: "ghost" }, { label: "Salvar novo PIN", cls: "primary", onClick: async (w) => {
+      const f = NC.$("#fPin", w);
+      if (!/^\d{4}$/.test(f.pin.value)) { NC.toast("O PIN deve ter 4 números.", "err"); return false; }
+      if (f.pin.value !== f.pin2.value) { NC.toast("Os PINs não conferem.", "err"); return false; }
+      const { error } = await NC.sb.auth.updateUser({ password: NC.authFromPhone(phone, f.pin.value).password });
+      if (error) { NC.err(error); return false; }
+      NC.toast("PIN alterado!");
+    } }]
+  });
+  NC.userPhone = (user) => (user && user.email ? user.email.split("@")[0] : "");
 
   /* Gráfico de barras simples por dia */
   NC.barChart = (el, rows, label = "acessos") => {
