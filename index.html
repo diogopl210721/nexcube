@@ -79,7 +79,12 @@ main,header,footer{position:relative;z-index:1}
 .scroll-hint i::after{content:"";position:absolute;left:50%;top:7px;width:4px;height:8px;margin-left:-2px;border-radius:2px;background:var(--ciano);animation:wheel 1.6s infinite}
 @keyframes wheel{to{transform:translateY(10px);opacity:0}}
 @media(max-width:900px){.hero .wrap{grid-template-columns:1fr;align-content:end;padding-bottom:110px;min-height:calc(100svh - 74px)}
-  .hero-copy{background:linear-gradient(to top,rgba(7,6,15,.92) 60%,transparent);padding-top:3rem}.hero h1{font-size:2.3rem}.chips{display:none}}
+  .hero-copy{background:none;padding-top:0}.hero h1{font-size:2.2rem;margin:.2rem 0 .9rem}.chips{display:none}
+  #cubeCanvas{top:74px;bottom:auto;height:42svh}
+  .hero .wrap{padding-top:calc(42svh + 4px);padding-bottom:2.5rem;align-content:start;min-height:0}
+  .hero{min-height:auto;padding-bottom:1rem}
+  .hero .cta{margin-top:1.4rem}.hero .cta .btn{padding:.8rem 1.2rem}
+  .scroll-hint{display:none}}
 
 /* MARQUEE */
 .marquee{border-block:1px solid var(--line);overflow:hidden;background:rgba(255,255,255,.015);padding:1.1rem 0}
@@ -105,9 +110,11 @@ section{padding:clamp(5rem,11vw,9rem) 0}
 .layer-count small{display:block;font-family:Inter;font-size:.8rem;letter-spacing:.25em;color:var(--mut);font-weight:600;margin-top:.5rem}
 .progress{height:4px;background:rgba(255,255,255,.08);border-radius:4px;margin-top:1.2rem;max-width:360px;overflow:hidden}
 .progress i{display:block;height:100%;width:0;background:var(--grad)}
-@media(max-width:900px){.print .wrap{grid-template-columns:1fr;align-content:start;padding-top:96px}
- .print .copy{background:linear-gradient(to bottom,rgba(7,6,15,.9) 60%,transparent);padding-bottom:2rem}
- .steps-print{display:none}.layer-count{margin-top:1rem}}
+@media(max-width:900px){.print .wrap{grid-template-columns:1fr;align-content:start;align-self:start;padding-top:92px}
+ .print .copy{background:none;padding-bottom:0;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+ .print h2{font-size:1.75rem}
+ .print .eyebrow{margin-bottom:.5rem}
+ .steps-print{display:none}.layer-count{margin-top:.6rem;font-size:2.4rem}.layer-count small{font-size:.65rem}.progress{margin-top:.6rem}}
 
 /* PRODUTOS */
 .head{display:flex;justify-content:space-between;align-items:end;gap:2rem;flex-wrap:wrap;margin-bottom:3rem}
@@ -619,7 +626,7 @@ function glowEdges(geo, color, opacity=.9){
 
   function size(){ const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w,h,false); composer.setSize(w,h); cam.aspect = w/h; cam.updateProjectionMatrix();
-    const isM = w < 900; root.position.set(isM?0:4.6, isM?3.3:0, 0); }
+    const isM = w < 900; root.position.set(isM?0:4.6, isM?-.2:0, 0); }
   size(); addEventListener('resize', size);
 
   // interação
@@ -645,7 +652,7 @@ function glowEdges(geo, color, opacity=.9){
     tops.forEach((m,i)=>{ m.position.copy(m.userData.home).addScaledVector(m.userData.dir, e + Math.sin(t*2+i)*.04);
       m.rotation.set(explode*(i%2?1:-1)*1.2, explode*i*.5, 0); });
     [N,C].forEach((m,i)=>{ m.position.copy(m.userData.home).addScaledVector(m.userData.dir, e*.8); });
-    root.scale.setScalar((innerWidth<900?.58:1) * (.6 + .4*ease));
+    root.scale.setScalar((innerWidth<900?.9:1) * (.6 + .4*ease));
     ring.rotation.z = t*.25; ring2.rotation.z = -t*.18;
     pts.rotation.y = t*.03 + mx*.2;
     bloom.strength = (mobile?.55:.75) + Math.sin(t*1.5)*.08;
@@ -744,7 +751,7 @@ function glowEdges(geo, color, opacity=.9){
 
   function size(){ const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w,h,false); composer.setSize(w,h); cam.aspect = w/h; cam.updateProjectionMatrix();
-    const isM = w < 900; rig.position.set(isM?0:2.6, isM?-3.1:-2.4, 0); rig.scale.setScalar(isM?.72:.95);
+    const isM = w < 900; rig.position.set(isM?0:2.6, isM?-4.3:-2.4, 0); rig.scale.setScalar(isM?.6:.95);
     cam.position.set(0, 3.2, isM?15:13); cam.lookAt(isM?0:0, isM?-.6:.4, 0); }
   size(); addEventListener('resize', size);
 
