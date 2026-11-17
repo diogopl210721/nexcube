@@ -8,7 +8,7 @@
 <link rel="icon" href="/assets/logo-cube.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/app.css?v=20261117d">
+<link rel="stylesheet" href="/css/app.css?v=20261117e">
 <style>html,body{height:100%;background:#0f0e1a}#app{min-height:100%}#app>.pp,#app>.pp2{min-height:100vh;min-height:100dvh}</style>
 </head>
 <body>
@@ -16,11 +16,11 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="/js/config.js?v=20261117d"></script>
-<script src="/js/core.js?v=20261117d"></script>
-<script src="/js/public.js?v=20261117d"></script>
-<script src="/js/minisite-models.js?v=20261117d"></script>
-<script src="/js/indica.js?v=20261117d"></script>
+<script src="/js/config.js?v=20261117e"></script>
+<script src="/js/core.js?v=20261117e"></script>
+<script src="/js/public.js?v=20261117e"></script>
+<script src="/js/minisite-models.js?v=20261117e"></script>
+<script src="/js/indica.js?v=20261117e"></script>
 <script>
 /* Roteador público (GitHub Pages entrega este arquivo para qualquer caminho que não existe):
    /r/NC-XXXX       -> QR Code / NFC dinâmico: resolve a tag e redireciona
@@ -36,6 +36,30 @@
     app.innerHTML = `<div class="pp-msg"><div><div style="font-size:2.4rem">🔒</div><h1>${NC.esc(title)}</h1><p>${NC.esc(text)}</p><footer>${NC.esc(C.footer)}</footer></div></div>`;
   }
 
+  /* Barra do dono: aparece só para quem está logado no painel (cliente dono da página ou Nexcube) */
+  async function ownerBar(slug) {
+    const has = (st, k) => { try { return !!st.getItem(k); } catch (e) { return false; } };
+    const areas = [];
+    if (has(localStorage, "nc-cli")) areas.push({ key: "nc-cli", store: localStorage, href: "/painel/", label: "Voltar ao meu painel" });
+    if (has(sessionStorage, "nc-adm")) areas.push({ key: "nc-adm", store: sessionStorage, href: "/adm/", label: "Voltar ao painel Nexcube" });
+    for (const a of areas) {
+      try {
+        const sb = window.supabase.createClient(C.supabaseUrl, C.supabaseKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: a.key, storage: a.store } });
+        const { data: { session } } = await sb.auth.getSession(); if (!session) continue;
+        const { data } = await sb.from("nc_customers").select("id").eq("public_slug", slug).maybeSingle();
+        if (!data) continue;
+        const bar = document.createElement("div"); bar.className = "own-bar";
+        bar.innerHTML = `<span class="own-t">${NC.icon("eye", 15)} ${a.key === "nc-cli" ? "Você está vendo a sua página" : "Visualizando como administrador"}</span>
+          <a class="own-b pri" href="${a.href}${a.key === "nc-adm" ? "#cliente/" + data.id : ""}">${NC.icon("edit", 15)} ${a.label}</a>
+          <button class="own-b" type="button">${NC.icon("logout", 15)} Sair</button>`;
+        bar.querySelector("button").onclick = async () => { await sb.auth.signOut(); bar.remove(); document.body.style.paddingBottom = ""; NC.toast && NC.toast("Você saiu do painel."); };
+        document.body.appendChild(bar); document.body.style.paddingBottom = "120px";
+        return true;
+      } catch (e) {}
+    }
+    return false;
+  }
+
   async function showPage(slug, tagCode) {
     const { data, error } = await NC.sb.rpc("nc_public_page", { p_slug: slug });
     if (error || !data || !data.ok) return msg("Página indisponível", "Este conteúdo está temporariamente indisponível. Tente novamente mais tarde.");
@@ -45,6 +69,8 @@
     NC.renderPublic(app, data, {
       onClick: (linkId) => { if (linkId) NC.sb.rpc("nc_log_event", { p_slug: slug, p_type: "click", p_link: linkId, p_tag: tagCode || null, p_ref: document.referrer || null, p_ua: navigator.userAgent }); }
     });
+    const owner = await ownerBar(slug);
+    if (owner) return; // o dono vendo a própria página não conta como visita
     // 1 visualização por sessão por página
     const k = "nc-v-" + slug;
     let seen = false; try { seen = sessionStorage.getItem(k); sessionStorage.setItem(k, "1"); } catch (e) {}
