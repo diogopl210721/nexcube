@@ -97,6 +97,7 @@
   }
 
   function route() {
+    if (location.hash === "#dash-chart") { const el = NC.$("#dash-chart"); if (el) el.scrollIntoView({ behavior: "smooth" }); history.replaceState(null, "", "#dashboard"); return; }
     const [id, arg] = (location.hash.replace("#", "") || "dashboard").split("/");
     NC.$$("[data-nav]").forEach((a) => a.classList.toggle("on", a.dataset.nav === (id === "cliente" ? "clientes" : id)));
     NC.$("#side") && NC.$("#side").classList.remove("open");
@@ -130,18 +131,24 @@
       <div class="topbar"><div><h1>Dashboard</h1><p class="muted">Visão geral da plataforma Nexcube 3D</p></div>
         <div class="row"><select id="per" style="width:auto"><option value="7">7 dias</option><option value="30">30 dias</option><option value="90">90 dias</option></select>
         <a class="btn primary" href="#clientes/novo">${ic("plus", 18)} Novo cliente</a></div></div>
+      <div class="quick">
+        <a href="#clientes/novo" class="qa primary">${ic("plus", 22)}<b>Novo cliente</b><small>Cadastro + login + tag</small></a>
+        <a href="#tags/nova" class="qa">${ic("tag", 22)}<b>Criar tags</b><small>Gerar códigos e QR</small></a>
+        <a href="#clientes" class="qa">${ic("users", 22)}<b>Clientes</b><small>Gerenciar páginas</small></a>
+        <a href="#minisites" class="qa">${ic("rocket", 22)}<b>Mini sites</b><small>Solicitações</small></a>
+      </div>
       <div class="cards">
-        <div class="kpi"><span>${ic("users", 16)} Clientes</span><b>${cs.length}</b><small>${cs.filter((c) => c.status === "active").length} ativos · ${cs.filter((c) => c.status === "pending").length} pendentes</small></div>
-        <div class="kpi"><span>${ic("tag", 16)} Tags</span><b>${ts.length}</b><small>${ts.filter((t) => t.status === "active" && t.customer_id).length} ativas e vinculadas</small></div>
-        <div class="kpi"><span>${ic("rocket", 16)} Mini sites</span><b>${reqOpen}</b><small>solicitações em aberto</small></div>
-        <div class="kpi"><span>${ic("nfc", 16)} Leituras de tags</span><b>${scans.length}</b><small>no período</small></div>
-        <div class="kpi"><span>${ic("eye", 16)} Visualizações</span><b>${views.length}</b><small>${clicks.length} cliques em links</small></div>
+        <a class="kpi click" href="#clientes"><span>${ic("users", 16)} Clientes</span><b>${cs.length}</b><small>${cs.filter((c) => c.status === "active").length} ativos · ${cs.filter((c) => c.status === "pending").length} pendentes</small><i class="go">${ic("down", 16)}</i></a>
+        <a class="kpi click" href="#tags"><span>${ic("tag", 16)} Tags</span><b>${ts.length}</b><small>${ts.filter((t) => t.status === "active" && t.customer_id).length} ativas e vinculadas</small><i class="go">${ic("down", 16)}</i></a>
+        <a class="kpi click" href="#minisites"><span>${ic("rocket", 16)} Mini sites</span><b>${reqOpen}</b><small>solicitações em aberto</small><i class="go">${ic("down", 16)}</i></a>
+        <a class="kpi click" href="#tags"><span>${ic("nfc", 16)} Leituras</span><b>${scans.length}</b><small>tags lidas no período</small><i class="go">${ic("down", 16)}</i></a>
+        <a class="kpi click" href="#dash-chart"><span>${ic("eye", 16)} Visualizações</span><b>${views.length}</b><small>${clicks.length} cliques em links</small><i class="go">${ic("down", 16)}</i></a>
       </div>
       <div class="split section">
-        <div class="card"><h3>Acessos às páginas por dia</h3><div id="ch"></div></div>
-        <div class="card"><h3>Tags mais acessadas</h3>${top.length ? `<div class="hbar">${top.map((x) => `<span><span class="code">${e(x.t.code)}</span> ${e(custName(x.t.customer_id))}</span><b>${x.n}</b><div class="tr"><i style="width:${(x.n / maxN) * 100}%"></i></div>`).join("")}</div>` : `<div class="empty">Sem leituras no período.</div>`}</div>
+        <div class="card" id="dash-chart"><h3>Acessos às páginas por dia</h3><div id="ch"></div></div>
+        <div class="card"><div class="row between" style="margin-bottom:.6rem"><h3 style="margin:0">Tags mais acessadas</h3><a class="small" href="#tags">Ver tags →</a></div>${top.length ? `<div class="hbar">${top.map((x) => `<span><span class="code">${e(x.t.code)}</span> ${e(custName(x.t.customer_id))}</span><b>${x.n}</b><div class="tr"><i style="width:${(x.n / maxN) * 100}%"></i></div>`).join("")}</div>` : `<div class="empty">Sem leituras no período.</div>`}</div>
       </div>
-      <div class="card"><h3>Atividades recentes</h3>${(au.data || []).length ? `<div class="feed">${au.data.map((a) => `<div><span class="dot">${ic(ACT_IC[a.action] || "sparkle", 16)}</span><span>${e(ACT[a.action] || a.action)}${a.customer_id ? ` · <a href="#cliente/${a.customer_id}">${e(custName(a.customer_id))}</a>` : ""}${a.metadata && a.metadata.code ? ` · <span class="code">${e(a.metadata.code)}</span>` : ""}<small>${NC.fmtDateTime(a.created_at)}</small></span></div>`).join("")}</div>` : `<div class="empty">Nenhuma atividade ainda.</div>`}</div>`;
+      <div class="card"><div class="row between" style="margin-bottom:.6rem"><h3 style="margin:0">Atividades recentes</h3><a class="small" href="#clientes">Ver clientes →</a></div>${(au.data || []).length ? `<div class="feed">${au.data.map((a) => `<div><span class="dot">${ic(ACT_IC[a.action] || "sparkle", 16)}</span><span>${e(ACT[a.action] || a.action)}${a.customer_id ? ` · <a href="#cliente/${a.customer_id}">${e(custName(a.customer_id))}</a>` : ""}${a.metadata && a.metadata.code ? ` · <span class="code">${e(a.metadata.code)}</span>` : ""}<small>${NC.fmtDateTime(a.created_at)}</small></span></div>`).join("")}</div>` : `<div class="empty">Nenhuma atividade ainda.</div>`}</div>`;
       NC.$("#per").value = days; NC.$("#per").onchange = (x) => { days = +x.target.value; draw(); };
       NC.barChart(NC.$("#ch"), NC.daySeries(views.concat(scans), days), "acessos");
     };
@@ -155,12 +162,12 @@
     v.innerHTML = `<div class="topbar"><div><h1>Clientes</h1><p class="muted">${S.customers.length} cadastrados</p></div><button class="btn primary" id="new">${ic("plus", 18)} Novo cliente</button></div>
       <div class="toolbar"><div class="search">${ic("search", 18)}<input id="q" placeholder="Buscar por empresa, responsável, e-mail..."></div>
         <select id="fs"><option value="">Todos os status</option><option value="active">Ativos</option><option value="pending">Pendentes</option><option value="suspended">Suspensos</option></select></div>
-      <div class="tbl-wrap"><table><thead><tr><th>Empresa</th><th>Responsável</th><th>Contato</th><th>Tags</th><th>Mini site</th><th>Status</th><th>Cadastro</th></tr></thead><tbody id="tb"></tbody></table></div>`;
+      <div class="tbl-wrap resp"><table><thead><tr><th>Empresa</th><th>Responsável</th><th>Contato</th><th>Tags</th><th>Mini site</th><th>Status</th><th>Cadastro</th></tr></thead><tbody id="tb"></tbody></table></div>`;
     const draw = () => {
       const L = S.customers.filter((c) => (!fs || c.status === fs) && (!q || [c.company_name, c.contact_name, c.phone, c.public_slug].join(" ").toLowerCase().includes(q)));
-      NC.$("#tb").innerHTML = L.length ? L.map((c) => `<tr class="click" data-id="${c.id}"><td><b>${e(c.company_name)}</b><div class="muted tiny">/${e(c.public_slug)}</div></td><td>${e(c.contact_name || "—")}</td>
-        <td class="small">${e(NC.fmtPhone(c.phone || "") || "—")}<div class="muted">${c.owner_user_id ? "com login" : "sem login"}</div></td><td>${S.tags.filter((t) => t.customer_id === c.id).length}</td>
-        <td>${badge(MS, c.minisite_status)}</td><td>${badge(ST, c.status)}</td><td class="small">${NC.fmtDate(c.created_at)}</td></tr>`).join("")
+      NC.$("#tb").innerHTML = L.length ? L.map((c) => `<tr class="click" data-id="${c.id}"><td class="full" data-label="Empresa"><b>${e(c.company_name)}</b><div class="muted tiny">/${e(c.public_slug)}</div></td><td data-label="Responsável">${e(c.contact_name || "—")}</td>
+        <td class="small" data-label="Login">${e(NC.fmtPhone(c.phone || "") || "—")}<div class="muted">${c.owner_user_id ? "com login" : "sem login"}</div></td><td data-label="Tags">${S.tags.filter((t) => t.customer_id === c.id).length}</td>
+        <td data-label="Mini site">${badge(MS, c.minisite_status)}</td><td data-label="Status">${badge(ST, c.status)}</td><td class="small" data-label="Cadastro">${NC.fmtDate(c.created_at)}</td></tr>`).join("")
         : `<tr><td colspan="7"><div class="empty">${ic("users", 34)}Nenhum cliente encontrado.</div></td></tr>`;
       NC.$$("#tb tr[data-id]").forEach((tr) => (tr.onclick = () => (location.hash = "cliente/" + tr.dataset.id)));
     };
@@ -486,26 +493,26 @@
   async function tagHistory(t) {
     const { data } = await NC.sb.from("nc_events").select("event_type,created_at,ua_category,referrer_host").eq("tag_id", t.id).order("created_at", { ascending: false }).limit(50);
     NC.modal({ title: "Acessos da tag " + t.code, wide: true,
-      body: (data || []).length ? `<div class="tbl-wrap"><table><thead><tr><th>Quando</th><th>Evento</th><th>Dispositivo</th><th>Origem</th></tr></thead><tbody>${data.map((x) => `<tr><td>${NC.fmtDateTime(x.created_at)}</td><td>${{ redirect: "Leitura da tag", view: "Visualização", click: "Clique" }[x.event_type]}</td><td>${e(x.ua_category || "—")}</td><td>${e(x.referrer_host || "—")}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Nenhum acesso registrado.</div>`,
+      body: (data || []).length ? `<div class="tbl-wrap resp"><table><thead><tr><th>Quando</th><th>Evento</th><th>Dispositivo</th><th>Origem</th></tr></thead><tbody>${data.map((x) => `<tr><td>${NC.fmtDateTime(x.created_at)}</td><td>${{ redirect: "Leitura da tag", view: "Visualização", click: "Clique" }[x.event_type]}</td><td>${e(x.ua_category || "—")}</td><td>${e(x.referrer_host || "—")}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Nenhum acesso registrado.</div>`,
       actions: [{ label: "Fechar", cls: "ghost" }] });
   }
 
-  async function tags(v) {
+  async function tags(v, arg) {
     await Promise.all([loadCustomers(), loadTags()]);
     let q = "", fs = "", fv = "";
     v.innerHTML = `<div class="topbar"><div><h1>Tags e QR Codes</h1><p class="muted">${S.tags.length} tags · endereço fixo ${e(C.site)}/r/CÓDIGO</p></div><button class="btn primary" id="nt">${ic("plus", 18)} Criar tags</button></div>
       <div class="toolbar"><div class="search">${ic("search", 18)}<input id="q" placeholder="Buscar código, apelido ou cliente"></div>
         <select id="fs"><option value="">Todos os status</option><option value="active">Ativas</option><option value="suspended">Suspensas</option></select>
         <select id="fv"><option value="">Vinculadas e livres</option><option value="y">Vinculadas</option><option value="n">Sem cliente</option></select></div>
-      <div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Cliente</th><th>Tipo</th><th>Destino</th><th>Status</th><th>Último acesso</th><th>Ações</th></tr></thead><tbody id="tb"></tbody></table></div>`;
+      <div class="tbl-wrap resp"><table><thead><tr><th>Código</th><th>Cliente</th><th>Tipo</th><th>Destino</th><th>Status</th><th>Último acesso</th><th>Ações</th></tr></thead><tbody id="tb"></tbody></table></div>`;
     const draw = () => {
       const L = S.tags.filter((t) => (!fs || t.status === fs) && (!fv || (fv === "y" ? t.customer_id : !t.customer_id)) && (!q || [t.code, t.label, custName(t.customer_id)].join(" ").toLowerCase().includes(q)));
-      NC.$("#tb").innerHTML = L.length ? L.map((t) => `<tr><td><span class="code">${e(t.code)}</span><div class="muted tiny">${e(t.label || "")}</div></td>
-        <td>${t.customer_id ? `<a href="#cliente/${t.customer_id}">${e(custName(t.customer_id))}</a>` : `<span class="muted">— livre —</span>`}</td>
-        <td class="small">${ED.TYPE_LABEL[t.tag_type]}</td><td class="small">${ED.DEST_LABEL[t.destination_type]}</td>
-        <td><span class="badge ${t.status === "active" ? "ok" : "bad"}">${t.status === "active" ? "Ativa" : "Suspensa"}</span></td>
-        <td class="small">${NC.fmtDateTime(t.last_access_at)}</td>
-        <td><div class="row" style="flex-wrap:nowrap">
+      NC.$("#tb").innerHTML = L.length ? L.map((t) => `<tr><td data-label="Código"><span class="code">${e(t.code)}</span><div class="muted tiny">${e(t.label || "")}</div></td>
+        <td data-label="Cliente">${t.customer_id ? `<a href="#cliente/${t.customer_id}">${e(custName(t.customer_id))}</a>` : `<span class="muted">— livre —</span>`}</td>
+        <td class="small" data-label="Tipo">${ED.TYPE_LABEL[t.tag_type]}</td><td class="small" data-label="Destino">${ED.DEST_LABEL[t.destination_type]}</td>
+        <td data-label="Status"><span class="badge ${t.status === "active" ? "ok" : "bad"}">${t.status === "active" ? "Ativa" : "Suspensa"}</span></td>
+        <td class="small" data-label="Último acesso">${NC.fmtDateTime(t.last_access_at)}</td>
+        <td class="full" data-label="Ações"><div class="row acts">
           <button class="btn sm" title="Como gravar a tag NFC" data-gv="${t.id}">${ic("nfc", 16)} Gravar</button>
           <button class="icon-btn" title="QR Code" data-qr="${t.id}">${ic("download", 18)}</button>
           <button class="icon-btn" title="Copiar URL" data-cp="${t.id}">${ic("copy", 18)}</button>
@@ -528,6 +535,7 @@
     NC.$("#fv").onchange = (x) => { fv = x.target.value; draw(); };
     NC.$("#nt").onclick = () => tagCreate();
     draw();
+    if (arg === "nova") { history.replaceState(null, "", "#tags"); tagCreate(); }
   }
 
   /* ======================= MINI SITES ======================= */
@@ -537,9 +545,9 @@
     if (error) NC.err(error);
     const R = data || [];
     v.innerHTML = `<div class="topbar"><div><h1>Solicitações de mini site</h1><p class="muted">Serviço adicional desenvolvido pela DDS Inovação</p></div></div>
-      <div class="tbl-wrap"><table><thead><tr><th>Cliente</th><th>Data</th><th>Tipo de negócio</th><th>Status</th><th>Responsável</th></tr></thead><tbody>
-      ${R.length ? R.map((r) => `<tr class="click" data-id="${r.id}"><td><b>${e(custName(r.customer_id))}</b></td><td class="small">${NC.fmtDate(r.created_at)}</td><td>${e(r.business_type || "—")}</td>
-        <td><span class="badge ${r.status === "published" ? "ok" : r.status === "cancelled" ? "bad" : "info"}">${e(RQ[r.status])}</span></td><td class="small">${e(r.assigned_to || "—")}</td></tr>`).join("")
+      <div class="tbl-wrap resp"><table><thead><tr><th>Cliente</th><th>Data</th><th>Tipo de negócio</th><th>Status</th><th>Responsável</th></tr></thead><tbody>
+      ${R.length ? R.map((r) => `<tr class="click" data-id="${r.id}"><td class="full" data-label="Cliente"><b>${e(custName(r.customer_id))}</b></td><td class="small" data-label="Data">${NC.fmtDate(r.created_at)}</td><td data-label="Negócio">${e(r.business_type || "—")}</td>
+        <td data-label="Status"><span class="badge ${r.status === "published" ? "ok" : r.status === "cancelled" ? "bad" : "info"}">${e(RQ[r.status])}</span></td><td class="small" data-label="Responsável">${e(r.assigned_to || "—")}</td></tr>`).join("")
         : `<tr><td colspan="5"><div class="empty">${ic("rocket", 34)}Nenhuma solicitação ainda.</div></td></tr>`}</tbody></table></div>`;
     NC.$$("tr[data-id]").forEach((tr) => (tr.onclick = () => reqModal(R.find((r) => r.id === tr.dataset.id))));
     if (openId) { const r = R.find((x) => x.id === openId); if (r) reqModal(r); }
