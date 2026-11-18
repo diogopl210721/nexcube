@@ -276,14 +276,16 @@
     ]);
     const st = { links: lk.data || [], tags: tg.data || [] };
     c._notes = nt.data ? nt.data.notes : "";
-    let tab = sessionStorage.getItem("nc-tab") || "resumo";
+    let tab = sessionStorage.getItem("nc-tab") || "inicio";
+    const TABS = [["inicio", "Início"], ["links", "Links"], ["pagina", "Página"], ["aparencia", "Aparência"], ["tags", "Tag" + (st.tags.length > 1 ? "s (" + st.tags.length + ")" : "")], ["stats", "Estatísticas"], ["acesso", "Acesso"], ["hist", "Histórico"]];
+    if (!TABS.some((x) => x[0] === tab)) tab = "inicio";
     v.innerHTML = `
       <div class="topbar"><div><a href="#clientes" class="small">← Clientes</a><h1>${e(c.company_name)} ${badge(ST, c.status)}</h1><p class="muted small">${e(NC.publicUrl(c.public_slug))}</p></div>
         <div class="row"><a class="btn" target="_blank" rel="noopener" href="${e(NC.publicUrl(c.public_slug))}">${ic("eye", 18)} Ver página</a>
           <button class="btn" id="edit">${ic("edit", 18)} Editar</button>
           <button class="icon-btn danger" id="delC" title="Excluir cliente">${ic("trash", 18)}</button>
           ${c.status !== "active" ? `<button class="btn primary" data-st="active">${ic("check", 18)} ${c.status === "pending" ? "Liberar acesso" : "Reativar"}</button>` : `<button class="btn" data-st="suspended" style="color:var(--bad)">Suspender</button>`}</div></div>
-      <div class="tabs">${[["resumo", "Resumo"], ["tags", "Tags (" + st.tags.length + ")"], ["pagina", "Perfil público"], ["minisite", "Mini site"], ["stats", "Estatísticas"], ["hist", "Histórico"]].map(([k, l]) => `<button data-tab="${k}">${l}</button>`).join("")}</div>
+      <div class="tabs tabs-scroll">${TABS.map(([k, l]) => `<button data-tab="${k}">${l}</button>`).join("")}</div>
       <div id="tabv"></div>`;
     NC.$("#edit").onclick = () => customerForm(c);
     NC.$("#delC").onclick = async () => {
@@ -307,9 +309,65 @@
     const show = (k) => {
       tab = k; sessionStorage.setItem("nc-tab", k);
       NC.$$("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === k));
-      ({ resumo: tResumo, tags: tTags, pagina: tPagina, minisite: tMinisite, stats: () => ED.stats(T, c, st.tags, st.links), hist: tHist })[k]();
+      ({ inicio: tInicio, links: () => tEdit("links"), pagina: () => tEdit("perfil"), aparencia: () => tEdit("ap"), tags: tTags, stats: () => ED.stats(T, c, st.tags, st.links), acesso: tResumo, hist: tHist })[k]();
     };
     NC.$$("[data-tab]").forEach((b) => (b.onclick = () => show(b.dataset.tab)));
+
+    async function tInicio() {
+      const steps = [
+        { done: !!c.logo_path, t: "Logo", d: "Marca no topo da página.", go: "pagina" },
+        { done: !!c.short_bio, t: "Frase curta", d: "O que o cliente faz, em poucas palavras.", go: "pagina" },
+        { done: st.links.filter((l) => l.is_active).length >= 2, t: "Pelo menos 2 links", d: "WhatsApp e Instagram são os mais clicados.", go: "links" },
+        { done: c.primary_color !== "#7a3cff" || c.bg_color !== "#0f0e1a", t: "Cores da marca", d: "Ajuste em Aparência.", go: "aparencia" },
+        { done: st.tags.some((t) => t.last_access_at), t: "Tag testada", d: "Aproxime o celular da tag ou leia o QR.", go: "tags" },
+        { done: !!c.owner_user_id, t: "Login do cliente", d: "Opcional: para o cliente editar sozinho.", go: "acesso" }
+      ];
+      const n = steps.filter((x) => x.done).length;
+      const since = new Date(Date.now() - 30 * 864e5).toISOString();
+      T.innerHTML = `
+        <div class="cards" id="kpis">
+          <div class="kpi"><span>${ic("eye", 16)} Visitas (30 dias)</span><b>…</b></div>
+          <div class="kpi"><span>${ic("custom", 16)} Cliques nos links</span><b>…</b></div>
+          <div class="kpi click" data-go="tags"><span>${ic("tag", 16)} Tags</span><b>${st.tags.length}</b><small>${st.tags.filter((t) => t.status === "active").length} ativa(s)</small></div>
+          <div class="kpi click" data-go="links"><span>${ic("custom", 16)} Links na página</span><b>${st.links.filter((l) => l.is_active).length}</b><small>${st.links.length} cadastrados</small></div>
+        </div>
+        <div class="split">
+          <div class="card"><div class="row between"><h3 style="margin:0">Página pronta?</h3><span class="badge ${n === steps.length ? "ok" : "info"}">${n} de ${steps.length}</span></div>
+            <div class="progress"><i style="width:${(n / steps.length) * 100}%"></i></div>
+            <div class="checklist">${steps.map((x) => `<button class="check-item ${x.done ? "done" : ""}" data-go="${x.go}"><span class="ck">${x.done ? ic("check", 16) : ""}</span><span class="grow"><b>${x.t}</b><small>${x.d}</small></span>${ic("down", 16)}</button>`).join("")}</div>
+          </div>
+          <div class="stack">
+            <div class="card stack"><h3 style="margin:0">Página pública</h3>
+              <div class="url-line"><span>${e(NC.publicUrl(c.public_slug))}</span><button class="icon-btn" id="cpP">${ic("copy", 18)}</button></div>
+              <div class="stack" style="gap:.5rem">
+                <button class="btn block" data-go="links">${ic("plus", 18)} Adicionar ou mudar um link</button>
+                <button class="btn block" data-go="aparencia">${ic("paint", 18)} Mudar cores da página</button>
+                <button class="btn block" data-go="tags">${ic("tag", 18)} QR Code / destino da tag</button></div></div>
+            <div class="card"><h3>Observações internas</h3><textarea id="notes" placeholder="Só a Nexcube vê">${e(c._notes || "")}</textarea><button class="btn sm" style="margin-top:.6rem" id="svN">Salvar observações</button></div>
+          </div>
+        </div>`;
+      NC.$("#cpP").onclick = () => NC.copy(NC.publicUrl(c.public_slug));
+      NC.$("#svN").onclick = async () => { const { error } = await NC.sb.from("nc_customer_notes").upsert({ customer_id: c.id, notes: NC.$("#notes").value.trim() || null, updated_at: new Date().toISOString() }); if (error) return NC.err(error); c._notes = NC.$("#notes").value.trim(); NC.toast("Observações salvas."); };
+      NC.$$("[data-go]", T).forEach((b) => (b.onclick = () => show(b.dataset.go)));
+      const { data } = await NC.sb.from("nc_events").select("event_type,ua_category").eq("customer_id", c.id).gte("created_at", since).limit(20000);
+      const ev = (data || []).filter((x) => x.ua_category !== "bot");
+      const k = NC.$$("#kpis .kpi b", T);
+      if (k.length) { k[0].textContent = ev.filter((x) => x.event_type === "view").length; k[1].textContent = ev.filter((x) => x.event_type === "click").length; }
+    }
+
+    function tEdit(kind) {
+      const TT = { links: ["Links", "Adicione, edite, esconda ou mude a ordem dos botões da página."], perfil: ["Página", "Logo, nome, apresentação e contatos que o visitante vê."], ap: ["Aparência", "Cores e estilo com a cara da marca do cliente."] }[kind];
+      T.innerHTML = `<div class="row between section"><p class="muted small">${TT[1]} <b>O cliente vê as mesmas alterações.</b></p>
+        <button class="btn sm" id="pvBtn">${ic("eye", 16)} Ver prévia</button></div>
+        <div class="split"><div id="ed"></div><div class="preview-col hide-m"><p class="muted small" style="text-align:center;margin-bottom:.6rem">Prévia ao vivo</p><div class="phone-frame"><div class="pv" id="pv"></div></div></div></div>`;
+      const refresh = () => { const pv = NC.$("#pv"); if (pv) NC.renderPublic(pv, ED.previewData(c, st.links), { preview: true }); };
+      NC.$("#pvBtn").onclick = () => { const m = NC.modal({ title: "Prévia da página", body: `<div class="phone-frame" style="position:static"><div class="pv" id="pvM"></div></div>`, actions: [{ label: "Fechar", cls: "ghost" }] }); NC.renderPublic(NC.$("#pvM", m.el), ED.previewData(c, st.links), { preview: true }); };
+      const ed = NC.$("#ed");
+      if (kind === "perfil") ED.profile(ed, c, { onChange: refresh, onSaved: refresh });
+      if (kind === "links") ED.links(ed, c, st, { onChange: refresh });
+      if (kind === "ap") ED.appearance(ed, c, { onChange: refresh, onSaved: refresh });
+      refresh();
+    }
 
     function tResumo() {
       T.innerHTML = `<div class="split">
@@ -319,10 +377,6 @@
             <div><span class="muted">Painel</span><br><b>${c.owner_user_id ? "Com acesso" : "Sem acesso"}</b></div><div><span class="muted">CNPJ</span><br><b>${e(c.document || "—")}</b></div>
             <div><span class="muted">Segmento</span><br><b>${e(c.segment || "—")}</b></div><div><span class="muted">Cadastro</span><br><b>${NC.fmtDate(c.created_at)}</b></div></div>
             ${c.address ? `<p class="small" style="margin-top:.8rem"><span class="muted">Endereço:</span> ${e(c.address)}</p>` : ""}</div>
-          <div class="card stack"><h3 style="margin:0">Página pública</h3>
-            <div class="url-line"><span>${e(NC.publicUrl(c.public_slug))}</span><button class="icon-btn" id="cpP">${ic("copy", 18)}</button></div>
-            <p class="muted small">Tags: ${st.tags.length ? st.tags.map((t) => `<span class="code">${e(t.code)}</span> → ${ED.DEST_LABEL[t.destination_type]}`).join(" · ") : "nenhuma"}</p></div>
-          <div class="card"><h3>Observações internas</h3><textarea id="notes" placeholder="Só a Nexcube vê">${e(c._notes || "")}</textarea><button class="btn sm" style="margin-top:.6rem" id="svN">Salvar observações</button></div>
         </div>
         <div class="card stack"><h3 style="margin:0">${ic("lock")} Acesso do cliente ao painel</h3>
           ${c.owner_user_id ? `<p class="alert ok small">${ic("check", 18)}<span>Login: <b>${e(NC.fmtPhone(c.phone || ""))}</b> + PIN. ${c.status === "active" ? "O cliente já pode entrar em <b>/painel</b>." : "O painel só abre quando o cliente estiver <b>ativo</b>."}</span></p>`
@@ -337,8 +391,6 @@
           ${c.phone ? `<a class="btn" target="_blank" rel="noopener" id="waAcc" href="#">${ic("whatsapp", 18)} Enviar instruções de acesso no WhatsApp</a>` : ""}
           <p class="muted tiny">Endereço do painel do cliente: ${e(C.site)}/painel</p>
         </div></div>`;
-      NC.$("#cpP").onclick = () => NC.copy(NC.publicUrl(c.public_slug));
-      NC.$("#svN").onclick = async () => { const { error } = await NC.sb.from("nc_customer_notes").upsert({ customer_id: c.id, notes: NC.$("#notes").value.trim() || null, updated_at: new Date().toISOString() }); if (error) return NC.err(error); NC.toast("Observações salvas."); };
       const fa = NC.$("#fAcc"); NC.maskPhone(fa.phone); NC.maskPhone(fa.phone2);
       fa.onsubmit = async (ev) => {
         ev.preventDefault(); const ok = NC.checkPhonePin(fa); if (!ok) return;
@@ -372,58 +424,6 @@
         NC.$('[data-a="st"]', bar).onclick = () => tagStatus(t);
         NC.$('[data-a="del"]', bar).onclick = () => { S.customers = S.customers.length ? S.customers : [c]; tagDelete(t); };
       });
-    }
-
-    function tPagina() {
-      T.innerHTML = `<div class="alert info section">${ic("eye", 18)}<span>Você está editando a página como administrador. O cliente vê as mesmas alterações no painel dele.</span></div>
-        <div class="tabs" style="border:0"><button data-sub="perfil" class="on">Perfil</button><button data-sub="links">Links</button><button data-sub="ap">Aparência</button></div>
-        <div class="split"><div id="ed"></div><div class="preview-col"><div class="phone-frame"><div class="pv" id="pv"></div></div></div></div>`;
-      const refresh = () => NC.renderPublic(NC.$("#pv"), ED.previewData(c, st.links), { preview: true });
-      const sub = (k) => {
-        NC.$$("[data-sub]").forEach((b) => b.classList.toggle("on", b.dataset.sub === k));
-        const ed = NC.$("#ed");
-        if (k === "perfil") ED.profile(ed, c, { onChange: refresh, onSaved: refresh });
-        if (k === "links") ED.links(ed, c, st, { onChange: refresh });
-        if (k === "ap") ED.appearance(ed, c, { onChange: refresh, onSaved: refresh });
-      };
-      NC.$$("[data-sub]").forEach((b) => (b.onclick = () => sub(b.dataset.sub)));
-      sub("perfil"); refresh();
-    }
-
-    async function tMinisite() {
-      const reqs = rq.data || [];
-      const { data: md } = await NC.sb.from("nc_settings").select("value").eq("key", "minisite_price").maybeSingle();
-      const pub = c.minisite_status === "published" && c.minisite_url;
-      T.innerHTML = `
-        <div class="ms-steps">
-          <div class="${pub ? "done" : "on"}"><b>1</b><span>Mostrar modelos</span></div>
-          <div class="${pub ? "done" : c.minisite_status !== "none" ? "on" : ""}"><b>2</b><span>Contratar com a DDS</span></div>
-          <div class="${pub ? "done" : ""}"><b>3</b><span>Colar o link e publicar</span></div>
-        </div>
-        ${pub ? `<div class="card section ms-live"><span class="badge ok">${ic("check", 14)} Mini site publicado</span>
-            <div class="url-line" style="margin-top:.7rem"><span>${e(c.minisite_url)}</span><a class="icon-btn" href="${e(c.minisite_url)}" target="_blank" rel="noopener">${ic("eye", 18)}</a></div>
-            <p class="muted small" style="margin-top:.5rem">O cliente já pode apontar a tag para o mini site em Minha tag.</p></div>`
-          : `<div class="card section" id="scA"></div>`}
-        <div class="split">
-          <div class="card stack"><h3 style="margin:0">${ic("rocket")} ${pub ? "Dados do mini site" : "Cliente contratou? Cole o link aqui"}</h3>
-            <label>Situação<select id="msS"><option value="none">Não contratado</option><option value="requested">Interessado / em negociação</option><option value="in_progress">Contratado, em desenvolvimento</option><option value="published">Publicado</option></select></label>
-            <label>Link do mini site<input id="msU" placeholder="https://..." value="${e(c.minisite_url || "")}" inputmode="url"></label>
-            <p class="muted small">Ao colar o link, a situação muda para <b>Publicado</b> e o cliente poderá apontar a tag para o mini site.</p>
-            <div><button class="btn primary" id="msSave">${ic("check", 18)} Salvar</button></div></div>
-          <div class="card"><h3>Solicitações do cliente</h3>${reqs.length ? `<div class="feed">${reqs.map((r) => `<div><span class="dot">${ic("rocket", 16)}</span><span><b>${e(RQ[r.status])}</b> · ${e(r.business_type || "")}<small>${NC.fmtDateTime(r.created_at)} · <a href="#minisites/${r.id}">abrir</a></small></span></div>`).join("")}</div>` : `<div class="empty">O cliente ainda não pediu pelo painel.</div>`}</div>
-        </div>`;
-      const scA = NC.$("#scA"); if (scA) ED.showcase(scA, { mode: "admin", c, price: md && md.value ? md.value.value : null });
-      const sel = NC.$("#msS"), inp = NC.$("#msU");
-      sel.value = c.minisite_status;
-      inp.addEventListener("input", () => { if (inp.value.trim()) sel.value = "published"; });
-      NC.$("#msSave").onclick = async () => {
-        const status = sel.value; let url = inp.value.trim();
-        if (url) { url = NC.normalizeUrl(url); if (!url) return NC.toast("Link inválido. Use https://", "err"); } else url = null;
-        if (status === "published" && !url) return NC.toast("Cole o link do mini site para publicar.", "err");
-        const { error } = await NC.sb.from("nc_customers").update({ minisite_status: status, minisite_url: url }).eq("id", c.id);
-        if (error) return NC.err(error); c.minisite_status = status; c.minisite_url = url;
-        NC.toast(status === "published" ? "Mini site publicado e vinculado ao cliente! 🎉" : "Mini site atualizado."); tMinisite();
-      };
     }
 
     async function tHist() {
