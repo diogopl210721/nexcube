@@ -556,3 +556,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:#faf9ff}
 .own-b.pri{background:linear-gradient(135deg,#8b3dff,#3b82f6);border:0}
 .own-b svg{width:15px;height:15px}
 body:has(.own-bar) #app>.pp2{padding-bottom:120px}
+
+/* evita estouro de largura por URLs longas (grid min-content) */
+.link-list,.stack{grid-template-columns:minmax(0,1fr)}
+.link-list>*,.stack>*,.card{min-width:0}
